@@ -23,11 +23,11 @@ t.describe('initial education profile (unverified until reviewed)', () => {
     assert.match(p.education[0].flag, /separate degree|major of one/); assert.match(p.education[3].flag, /not a teaching credential/i);
     assert.deepEqual([p.certs, p.experience, p.skills], [[], [], []], 'no licenses, certifications or experience invented');
   });
-  t.it('seeds her stated preferences: $27/hr minimum, priority cities, California-wide', async () => {
+  t.it('seeds her stated preferences: $28/hr minimum, $30/hr desired, priority cities, California-wide', async () => {
     const p = (await c.req('GET', '/api/bootstrap')).data.profile;
-    assert.deepEqual(p.salary, { min: 27, desired: null, period: 'hour', showBelow: false });
+    assert.deepEqual(p.salary, { min: 28, desired: 30, period: 'hour', showBelow: false });
     assert.deepEqual(p.cities.slice(0, 5), ['North Stockton, CA', 'Stockton, CA', 'Lodi, CA', 'Tracy, CA', 'Manteca, CA']); assert.equal(p.statewide, true);
-    assert.equal(KJ.profileFloor(p), 27 * 2080);
+    assert.equal(KJ.profileFloor(p), 28 * 2080); assert.equal(KJ.profileDesired(p), 30 * 2080);
   });
   t.it('seeding is idempotent and starts a first search', async () => {
     const P = require('../server/profile'); const uid = env.db.prepare('SELECT id FROM users').get().id;
@@ -49,14 +49,17 @@ t.describe('initial education profile (unverified until reviewed)', () => {
     assert.notEqual(sp.classification, 'needs_more', 'unclear credential does not exclude the job'); assert.ok(sp.unknown.some((x) => /Credential/.test(x)));
     assert.equal(by('Program Specialist').match.qualification.checks.find((x) => x.kind === 'education').status, 'reported', 'the reported master’s is unconfirmed');
   });
-  t.it('hourly minimum: $27/hr hides lower-paying jobs; higher pay ranks higher', async () => {
+  t.it('hourly minimum: $28/hr hides lower-paying jobs; higher pay ranks higher', async () => {
     env.mock.state.jobs.push(adz(4, { title: 'Budget Aide', salary_min: 40000, salary_max: 50000 }), adz(5, { title: 'Budget Director', salary_min: 100000, salary_max: 120000 }));
     await c.req('POST', '/api/search/run'); await env.pipeline.drain();
     const jobs = (await c.req('GET', '/api/feed')).data.jobs, prof = (await c.req('GET', '/api/bootstrap')).data.profile;
     assert.equal(jobs.find((j) => j.title === 'Budget Aide').match.salary.status, 'below');
     assert.ok(!KJ.buildFeed(jobs, prof).forYou.some((j) => j.title === 'Budget Aide'));
-    const a = jobs.find((j) => j.title === 'Budget Analyst').match.salary.score, d = jobs.find((j) => j.title === 'Budget Director').match.salary.score;
-    assert.ok(d > a, 'pay further above the minimum scores higher');
+    assert.equal(jobs.find((j) => j.title === 'Budget Director').match.salary.status, 'meets_desired');
+    env.mock.state.jobs.push(adz(7, { title: 'Financial Analyst I', salary_min: 70000, salary_max: 80000 }), adz(8, { title: 'Financial Analyst II', salary_min: 100000, salary_max: 120000 }));
+    await c.req('POST', '/api/search/run'); await env.pipeline.drain();
+    const pair = (await c.req('GET', '/api/feed')).data.jobs, lo = pair.find((j) => j.title === 'Financial Analyst I').match, hi = pair.find((j) => j.title === 'Financial Analyst II').match;
+    assert.ok(hi.overall > lo.overall, `otherwise-identical jobs: higher pay ranks higher (${hi.overall} vs ${lo.overall})`); assert.ok(hi.payBonus > lo.payBonus);
     const pay = KJ.buildFeed(jobs, prof).sections.find((s) => s.id === 'pay'); assert.ok(pay && pay.items[0].title === 'Budget Director', 'higher-paying section leads with the highest pay');
   });
   t.it('California-wide: a Fresno job is considered, labelled as elsewhere in California', async () => {

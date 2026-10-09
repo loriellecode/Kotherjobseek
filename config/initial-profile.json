@@ -25,6 +25,6 @@
     "statewide": true,
     "workModes": ["onsite"],
     "types": ["Full-time"],
-    "salary": { "min": 27, "period": "hour" }
+    "salary": { "min": 28, "desired": 30, "period": "hour" }
   }
 }

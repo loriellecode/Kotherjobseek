@@ -195,6 +195,8 @@
       { key: 'type', label: 'Employment type', weight: 5, score: typeStatus === 'match' ? 100 : typeStatus === 'unknown' ? 60 : 0 },
     ];
     let overall = Math.round(parts.reduce((s, p) => s + (p.weight * p.score) / 100, 0));
+    // Pay above her desired rate keeps ranking higher (up to +5), so higher-paying roles are prioritized even once the target is met.
+    let payBonus = 0; const dsr = profileDesired(profile); if (salary.status === 'meets_desired' && dsr) { const top = (annual(job.salaryMin, job.salaryMax, job.salaryPeriod) || { max: 0 }).max; payBonus = Math.min(5, Math.round((10 * (top - dsr)) / dsr)); overall = Math.min(100, overall + payBonus); }
     let capped = false;
     if (unmet.length && overall > 60) { overall = 60; capped = true; }
 
@@ -211,11 +213,11 @@
     if (salary.status === 'meets_desired' || salary.status === 'meets_min') reasons.push(salary.text);
 
     return {
-      classification, overall, capped, parts, reasons, meets, unverified, unknown, gaps,
+      classification, overall, capped, payBonus, parts, reasons, meets, unverified, unknown, gaps,
       qualification: { level: qLevel, score: qScore, checks, mandatoryUnmet: unmet.length, mandatoryUnknown: mUnknown.length, mandatoryUnverified: mReported.length },
       salary, location, alignment: align, typeStatus,
       excluded: { belowFloor: salary.status === 'below' },
-      explanation: 'Overall relevance is a weighted estimate of how well this listing aligns with the profile you entered: qualifications 35%, field alignment 25%, location 20%, salary 15%, employment type 5%. A required qualification you appear not to meet caps it at 60. It is not a prediction of whether you will be hired.',
+      explanation: 'Overall relevance is a weighted estimate of how well this listing aligns with the profile you entered: qualifications 35%, field alignment 25%, location 20%, salary 15%, employment type 5%. Pay above your desired rate adds up to 5 points. A required qualification you appear not to meet caps it at 60. It is not a prediction of whether you will be hired.',
     };
   }
 

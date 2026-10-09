@@ -39,13 +39,13 @@ const results = []; const ok = (name, detail) => { results.push(['PASS', name]);
   await page.click('.sheet >> text=Add education'); await page.fill('input[name=field]', 'Accounting'); await page.click('.sheet >> text=Save Changes'); await wait('.reclist .rec'); assert.equal(await page.locator('.reclist .rec').count(), 4); ok('adding an education record works');
   await page.click('.sheet >> text=Done');
   // salary shown as hourly
-  assert(await page.locator('.sec-card:has(h3:text("Salary")) p', { hasText: '$56,160' }).isVisible()); ok('$27/hr minimum shown (annualized $56,160)');
+  assert(await page.locator('.sec-card:has(h3:text("Salary")) p', { hasText: '$58,240' }).isVisible()); ok('$28/hr minimum shown (annualized $58,240)');
   await done();
 
   // ---- feed + careers ----
   await page.goto(B + '/#/discover'); await wait('.featured');
   console.log('sections:', await page.locator('.section h2').allInnerTexts());
-  const titles = [...new Set(await page.locator('.card h3, .featured h2').allInnerTexts())]; assert(!titles.includes('Instructional Aide'), '$27/hr floor hides $38–44k aide'); ok('feed honours the $27/hr floor', titles.join(', '));
+  const titles = [...new Set(await page.locator('.card h3, .featured h2').allInnerTexts())]; assert(!titles.includes('Instructional Aide'), '$28/hr floor hides $38–44k aide'); ok('feed honours the $28/hr floor', titles.join(', '));
   await wait('#rail-careers'); const careers = await page.locator('.card.career h3').allInnerTexts(); assert(careers.length >= 1); ok('"Other Careers to Explore" shows evidence-backed careers (education only → few)', careers.join(' | '));
   const c0 = page.locator('.card.career').first(); assert(/Why your background may be relevant/i.test(await c0.innerText())); assert(await c0.locator('text=Include in searches').isVisible()); assert(await c0.locator('text=Exclude').isVisible());
   await c0.locator('summary').click(); assert(/Typically required/i.test(await c0.innerText())); await shot('03-careers');

@@ -28,7 +28,7 @@ is overridden (so test mocks can never feed the real app).
 `config/initial-profile.json` seeds a new account with exactly what the family provided — four education items (Finance major;
 Bachelor's in Business Management and Administration; Business Finance major; Master's in Special Education), each stored
 **unverified with an explanation of what is unclear**, no school names, dates, exact degree titles, licenses or certifications —
-plus her preferences ($27/hour minimum, North Stockton → Stockton → Lodi → Tracy → Manteca, California-wide OK). Matching treats
+plus her preferences ($28/hour minimum, $30/hour desired, North Stockton → Stockton → Lodi → Tracy → Manteca, California-wide OK). Matching treats
 unverified education as *reported, not confirmed*: such jobs can't be a "Strong match" until she confirms, nothing is excluded for
 an unclear credential, and a master's degree is **never** treated as a teaching credential or license. For an existing account:
 `npm run seed -- her@email`.
