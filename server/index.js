@@ -14,9 +14,12 @@ const providers = require('./providers');
 const { Pipeline } = require('./pipeline');
 const { feedFor, rematchUser } = require('./matcher');
 const careersEngine = require('./careers');
+const emailEngine = require('./emailEngine');
+const E = require('../shared/emailDoc').email;
 const { normalizeListing } = require('./normalize');
 const { upsertJob, jobView } = require('./jobs');
 
+const A_where = (j) => (j.remote ? 'Remote' : [j.city, j.state].filter(Boolean).join(', '));
 const PUBLIC = path.join(config.root, 'public'), SHARED = path.join(config.root, 'shared');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
 const APP_STATUSES = ['interested', 'applied', 'interviewing', 'offer', 'rejected', 'withdrawn', 'closed'];
@@ -66,7 +69,7 @@ function createApp(db, pipeline) {
   route('POST', '/api/profile/:kind', async (req, res, m) => { const r = P.addRecord(db, req.user.id, m.kind, await H.readJson(req)); H.send(res, 201, Object.assign({ id: r.result }, afterChange(req.user.id, r))); });
   route('PUT', '/api/profile/:kind/:id', async (req, res, m) => H.send(res, 200, afterChange(req.user.id, P.updateRecord(db, req.user.id, m.kind, Number(m.id), await H.readJson(req)))));
   route('DELETE', '/api/profile/:kind/:id', (req, res, m) => H.send(res, 200, afterChange(req.user.id, P.deleteRecord(db, req.user.id, m.kind, Number(m.id)))));
-  route('DELETE', '/api/profile', (req, res) => { resume.removeResume(db, req.user.id); P.deleteAllProfileData(db, req.user.id); rematchUser(db, req.user.id); H.send(res, 200, { profile: P.getProfile(db, req.user.id) }); });
+  route('DELETE', '/api/profile', (req, res) => { db.prepare('DELETE FROM email_drafts WHERE user_id=?').run(req.user.id); resume.removeResume(db, req.user.id); P.deleteAllProfileData(db, req.user.id); rematchUser(db, req.user.id); H.send(res, 200, { profile: P.getProfile(db, req.user.id) }); });
   route('DELETE', '/api/account', async (req, res) => {
     const b = await H.readJson(req), u = db.prepare('SELECT * FROM users WHERE id=?').get(req.user.id);
     if (!(await auth.verifyPassword(String(b.password || ''), u.pw_hash))) throw new H.HttpError(403, 'Password is incorrect.');
@@ -92,6 +95,24 @@ function createApp(db, pipeline) {
     const b = await H.readJson(req).catch(() => ({}));
     let r; try { r = resume.decideProposal(db, req.user.id, Number(m.id), m.action === 'accept', b); } catch (e) { if (e.status === 409) return H.send(res, 409, { error: e.message, conflict: e.extra.conflict }); throw e; }
     if (r) { r.classes = [...new Set([...r.classes, 'resume'])]; H.send(res, 200, Object.assign(afterChange(req.user.id, r), resume.state(db, req.user.id))); } else H.send(res, 200, Object.assign({ ok: true }, resume.state(db, req.user.id)));
+  });
+
+  /* ---- Job Email Assistant: drafts only. Nothing here ever sends email. ---- */
+  const aiLimit = H.rateLimiter(40, 60 * 60000);
+  route('GET', '/api/email/capabilities', (req, res) => H.send(res, 200, { sends: false, ai: { configured: emailEngine.aiConfigured(), provider: 'Anthropic', disclosure: 'If you turn on AI, the email draft, the job title/employer/description, and the confirmed work history and skills selected for this job are sent to Anthropic to write the email. Your name, phone, email address and résumé file are never sent.' } }));
+  const cleanDraft = (b) => ({ to: String(b.to || '').trim().slice(0, 254), subject: String(b.subject || '').replace(/[\r\n]+/g, ' ').slice(0, 300), html: E.blocksToHtml(E.htmlToBlocks(String(b.html || '').slice(0, 100000))), notes: String(b.notes || '').slice(0, 2000) });
+  route('GET', '/api/email/drafts/:id', (req, res, m) => { const id = jobId(m), r = db.prepare('SELECT * FROM email_drafts WHERE user_id=? AND job_id=?').get(req.user.id, id); H.send(res, 200, { draft: r ? { to: r.recipient, subject: r.subject, html: r.body_html, notes: r.notes, updatedAt: r.updated_at } : null }); });
+  route('PUT', '/api/email/drafts/:id', async (req, res, m) => { const id = jobId(m), d = cleanDraft(await H.readJson(req, 200 * 1024)); db.prepare('INSERT INTO email_drafts(user_id,job_id,recipient,subject,body_html,notes,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id,job_id) DO UPDATE SET recipient=excluded.recipient, subject=excluded.subject, body_html=excluded.body_html, notes=excluded.notes, updated_at=excluded.updated_at').run(req.user.id, id, d.to, d.subject, d.html, d.notes, now()); H.send(res, 200, { saved: true, updatedAt: now() }); });
+  route('DELETE', '/api/email/drafts/:id', (req, res, m) => { db.prepare('DELETE FROM email_drafts WHERE user_id=? AND job_id=?').run(req.user.id, jobId(m)); H.send(res, 200, { deleted: true }); });
+  route('POST', '/api/email/draft', async (req, res) => {
+    const b = await H.readJson(req, 200 * 1024), id = jobId({ id: b.jobId }); const row = db.prepare('SELECT * FROM jobs WHERE id=?').get(id), job = jobView(row);
+    const d = cleanDraft(b), profile = P.getProfile(db, req.user.id), app = db.prepare('SELECT applied_on FROM applications WHERE user_id=? AND job_id=?').get(req.user.id, id);
+    const wantsAi = b.useAi === true && b.consent === true; if (wantsAi) aiLimit(String(req.user.id));
+    const ea = job.emailApply ? Object.assign({}, job.emailApply) : null;
+    const ctx = { job: { title: job.title, employer: job.employer, location: A_where(job), description: job.description, required: job.required }, facts: emailEngine.applicantFacts(profile, job), email: ea, to: d.to, notes: d.notes, subject: d.subject, appliedOn: app && app.applied_on, useAi: wantsAi };
+    if (b.action === 'review') { ctx.userText = ''; return H.send(res, 200, { warnings: emailEngine.review(E.htmlToBlocks(d.html), ctx) }); } // live check while she edits; no rewriting
+    const out = await emailEngine.runAction(String(b.action), { blocks: E.htmlToBlocks(d.html), subject: d.subject }, ctx);
+    H.send(res, 200, out);
   });
 
   /* ---- career expansion ---- */

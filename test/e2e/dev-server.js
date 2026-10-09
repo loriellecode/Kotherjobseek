@@ -12,6 +12,8 @@ const jobs=[
  J(5,'Assistant Principal','Test Charter Schools','Stockton',105000,125000,"Instructional leadership. Master's degree required. Valid California Administrative Services Credential required. 3 years of education experience."),
  J(6,'Accounts Payable Specialist','Test Foods','Stockton',46000,58000,"Process invoices. High school diploma required. 1 year of accounting experience preferred."),
  J(7,'Business Analyst (Remote)','Test Advisory','',80000,98000,"This is a fully remote position. Analyze business processes. Bachelor's degree required."),
+ J(9,'Employment Specialist','Test Workforce Board','Stockton',62000,74000,"Provide job coaching and case management. Bachelor's degree preferred. To apply, email your resume and cover letter to hiring@testworkforce.example.test with the subject line Employment Specialist Application."),
+ J(10,'Program Coordinator','Test Community Services','Lodi',60000,70000,"Coordinate programs. Please email your resume to apply. Bachelor's degree required."),
  J(8,'Instructional Aide','Test Unified School District','Stockton',38000,44000,"Assist teachers in a special education classroom. High school diploma required."),
 ];
 http.createServer((q,r)=>{const u=new URL(q.url,'http://x');r.writeHead(200,{'content-type':'application/json'});const pg=Number(u.pathname.split('/').pop());r.end(JSON.stringify({count:jobs.length,results:pg===1?jobs:[]}));}).listen(4101,'127.0.0.1');

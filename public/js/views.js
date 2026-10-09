@@ -36,14 +36,17 @@
 
   /* ---------- cards ---------- */
   function card(j, variant) {
-    const m = j.match, more = j.remote ? 'Remote' : (j.categories || [])[0] || 'Nearby';
+    const m = j.match, more = j.remote ? 'Remote' : (j.categories || [])[0] || 'Nearby', cat = (j.categories || [])[0] || '';
     const blurb = variant === 'wide' ? (m.reasons[0] ? m.reasons.slice(0, 2).join('. ') + '.' : '') : '';
+    const chipTxt = j.remote ? 'Remote' : j.type || '';
+    const emailChip = j.emailApply && j.emailApply.confidence === 'high' ? '<span class="chip-over mail">✉ Email to apply</span>' : '';
     return `<article class="card ${variant || ''}" data-job="${j.id}"><a class="open" href="#/job/${j.id}" aria-label="${esc(j.title)}, ${esc(j.employer)}"></a>
-      ${variant === 'compact' ? '' : `<div class="artwrap">${art(j)}${tags(j)}</div>`}
-      <div class="employer">${esc(j.employer)}${variant === 'compact' ? ' ' + (isNew(j) ? '<span class="badge-new">New</span>' : '') + stale(j) : ''}</div>
-      <h3>${esc(j.title)}</h3><div class="meta">${esc(A.shortWhere(j))}${j.type ? ' · ' + esc(j.type) : ''}</div><div class="pay">${esc(A.pay(j))}${A.payAlt(j) ? `<span class="pay-alt">${esc(A.payAlt(j))}</span>` : ''}</div>
-      ${blurb ? `<p class="blurb">${esc(blurb)}</p>` : ''}<div>${matchBadge(m)}</div>
-      <div class="foot"><button class="pill" data-action="more" data-cat="${esc(more)}">More in ${esc(more)}</button><span class="grow"></span>${jobButtons(j)}</div></article>`;
+      ${variant === 'compact' ? '' : `<div class="artwrap">${art(j)}${chipTxt ? `<span class="chip-over">${esc(chipTxt)}</span>` : ''}<div class="tags">${isNew(j) ? '<span class="badge-new">New</span>' : ''}${stale(j)}${emailChip}</div></div>`}
+      <div class="employer">${esc(j.employer)}${variant === 'compact' ? ' ' + (isNew(j) ? '<span class="badge-new">New</span>' : '') + stale(j) + (emailChip ? ' ✉' : '') : ''}</div>
+      ${cat ? `<div class="catlabel" style="color:${A.CAT_COLOR[cat] || 'var(--accent)'}">${esc(cat)}${j.type ? ' · ' + esc(j.type) : ''}</div>` : ''}
+      <h3>${esc(j.title)}</h3><div class="meta">${esc(A.shortWhere(j))}</div><div class="pay">${esc(A.pay(j))}${A.payAlt(j) ? `<span class="pay-alt">${esc(A.payAlt(j))}</span>` : ''}</div>
+      ${j.deadline ? `<div class="meta">Closes ${esc(A.fmtDate(j.deadline))}</div>` : ''}${blurb ? `<p class="blurb">${esc(blurb)}</p>` : ''}
+      <div class="foot"><span class="matchpill ${m.classification}">${esc(KJ.CLASS_SHORT[m.classification])}</span><span class="grow"></span>${jobButtons(j)}</div></article>`;
   }
   /* Links are classified on the server (see server/linkSafety.js). Unrecognized sites require an explicit review step before opening. */
   function applyButton(j) {
@@ -58,18 +61,19 @@
     return `<p class="linknote ${L.level}">${icon(ic)}<span><b>${esc(head)}.</b> ${esc((L.notes || []).join(' '))}${L.level === 'blocked' ? ' Search for this job on the employer’s own website instead.' : ''}</span></p>`;
   }
   function featuredCard(j, label) {
-    const m = j.match, why = m.reasons.slice(0, 3), saved = !!j.userState.saved;
-    return `<article class="featured" data-open="${j.id}"><div class="body">
-      <div class="eyebrow-line">${esc(label || 'Featured')} · ${KJ.CLASS_SHORT[m.classification]} ${isNew(j) ? '<span class="badge-new">New</span>' : ''} ${stale(j)}</div>
-      <h2><a href="#/job/${j.id}" style="text-decoration:none">${esc(j.title)}</a></h2><div class="employer">${esc(j.employer)}</div>
-      <dl class="stats"><div><dt>Salary</dt><dd>${esc(A.pay(j))}${A.payAlt(j) ? `<span class="pay-alt">${esc(A.payAlt(j))}</span>` : ''}</dd></div><div><dt>Location</dt><dd>${esc(A.shortWhere(j))}</dd></div><div><dt>Type</dt><dd>${esc(j.type || 'Not listed')}</dd></div><div><dt>Deadline</dt><dd>${j.deadline ? esc(A.fmtDate(j.deadline)) : 'Not listed'}</dd></div></dl>
-      <a class="mini" href="#/job/${j.id}">${logo(j)}<span><small>View details</small><b>${esc(j.title)}</b></span>${icon('right')}</a>
-      <div class="actions">${applyButton(j)}<button class="btn glass" data-action="save" data-id="${j.id}" aria-pressed="${saved}">${icon('bookmark', saved ? 'fill' : '')} ${saved ? 'Saved' : 'Save'}</button><button class="btn glass" data-action="dismiss" data-id="${j.id}">${icon('x')} Not interested</button></div>
-      ${linkNote(j)}
-      <div class="explain"><b>Why it’s here</b><ul>${(why.length ? why : ['No confirmed alignment yet — add details to your profile']).map((r) => `<li>${esc(r)}</li>`).join('')}${m.unknown[0] ? `<li>Still to verify: ${esc(m.unknown[0])}</li>` : ''}${m.gaps[0] ? `<li>Possible gap: ${esc(m.gaps[0])}</li>` : ''}</ul>
-        <p class="mini-ind"><span>Salary: ${esc(m.salary.text)}</span><span>Location: ${esc(m.location.text)}</span></p></div>
-      <p class="src">Source: ${esc(A.providerName(j.provider))}${j.lastVerified ? ' · last seen ' + esc(A.ago(j.lastVerified)) : ''}</p></div>
-      <div class="visual">${art(j, 'big')}</div></article>`;
+    const m = j.match, why = m.reasons.slice(0, 3), saved = !!j.userState.saved, cat = (j.categories || [])[0] || '';
+    return `<article class="hero" data-open="${j.id}">
+      <div class="hero-bg" style="--h:${A.hue(j.employer)}" data-img-topic="${A.topicFor(j)}" data-hero="1"></div><div class="hero-shade"></div>
+      <div class="hero-body">
+        <div class="hero-eyebrow">${esc(label || 'Featured')}${cat ? ' · ' + esc(cat) : ''} · ${esc(KJ.CLASS_SHORT[m.classification])} ${isNew(j) ? '<span class="badge-new onimg">New</span>' : ''} ${stale(j)}</div>
+        <h2><a href="#/job/${j.id}">${esc(j.title)}</a></h2>
+        <div class="hero-sub">${esc(j.employer)}</div>
+        <p class="hero-meta">${esc(A.where(j))} · <b>${esc(A.pay(j))}</b>${A.payAlt(j) ? ` <span>${esc(A.payAlt(j))}</span>` : ''}${j.type ? ' · ' + esc(j.type) : ''}${j.deadline ? ' · Closes ' + esc(A.fmtDate(j.deadline)) : ''}</p>
+        <div class="hero-actions"><a class="btn white" href="#/job/${j.id}">View opportunity</a>${applyButton(j)}
+          <button class="btn glass-dark icon" data-action="save" data-id="${j.id}" aria-pressed="${saved}" aria-label="${saved ? 'Remove from saved' : 'Save job'}">${icon('bookmark', saved ? 'fill' : '')}</button><button class="btn glass-dark icon" data-action="dismiss" data-id="${j.id}" aria-label="Not interested">${icon('x')}</button></div>
+      </div><span class="hero-credit"></span></article>
+      <section class="why"><div class="why-col"><b>Why it’s here</b><ul>${(why.length ? why : ['No confirmed alignment yet — add details to your profile']).map((r) => `<li>${esc(r)}</li>`).join('')}${m.unknown[0] ? `<li>Still to verify: ${esc(m.unknown[0])}</li>` : ''}${m.gaps[0] ? `<li>Possible gap: ${esc(m.gaps[0])}</li>` : ''}</ul></div>
+        <div class="why-col"><p class="mini-ind"><span>Salary: ${esc(m.salary.text)}</span><span>Location: ${esc(m.location.text)}</span></p>${linkNote(j)}<p class="src">Source: ${esc(A.providerName(j.provider))}${j.lastVerified ? ' · last seen ' + esc(A.ago(j.lastVerified)) : ''}</p></div></section>`;
   }
   function imageSlot(topic, kind) { return topic ? `<div class="${kind}" data-img-topic="${esc(topic)}" hidden></div>` : ''; }
   function section(sec) {
@@ -108,14 +112,19 @@
   /* ---------- shell ---------- */
   function shell(route, title, eyebrow, inner, opts) {
     opts = opts || {};
-    const nav = [['discover', 'Discover', 'compass'], ['saved', 'Saved', 'bookmark'], ['applications', 'Applications', 'check'], ['profile', 'Profile', 'user']];
-    const nm = (profile() && profile().name) || '', unread = S().unread;
+    const tabs = [['discover', 'Discover'], ['saved', 'Saved'], ['applications', 'Applications'], ['profile', 'Profile']];
+    const unread = S().unread, here = route === 'job' ? 'discover' : route;
     const pop = ses().notesOpen ? `<div class="pop" role="dialog" aria-label="Notifications">${S().notes.map((n) => `<a class="item" href="${esc(n.link || '#/discover')}" data-action="close-pop"><b>${esc(n.title)}</b><span>${esc(n.body.split('\n')[0])}</span><small>${esc(A.ago(n.created_at))}</small></a>`).join('') || '<div class="item"><b>You’re all caught up</b><span>Nothing needs your attention.</span></div>'}<a class="item link" href="#/profile" data-action="close-pop">Notification preferences</a></div>` : '';
-    return `<div class="shell"><nav class="nav" aria-label="Primary"><div class="brand" aria-hidden="true">K</div>${nav.map(([r, l, ic]) => `<a href="#/${r}" ${route === r ? 'aria-current="page"' : ''}>${icon(ic)}<span>${l}</span></a>`).join('')}</nav>
-      <main id="main"><div class="topbar"><div class="titles"><div class="eyebrow">${esc(eyebrow)}</div>${title ? `<h1 class="page">${esc(title)}</h1>` : ''}</div>
-      ${opts.search ? `<form class="search" role="search" data-form="search"><span class="sr"><label for="q">Search jobs</label></span>${icon('search')}<input id="q" type="search" placeholder="Search jobs" value="${esc(ses().q)}" autocomplete="off" enterkeyhint="search">${ses().q ? `<button type="button" class="clear" data-action="clear-search" aria-label="Clear search">${icon('x')}</button>` : ''}</form>` : ''}
-      <div class="tools"><button class="icon-btn" data-action="notes" aria-label="Notifications${unread ? ` (${unread} unread)` : ''}" aria-expanded="${ses().notesOpen}">${icon('bell')}${unread ? '<span class="dot"></span>' : ''}</button>${pop}</div>
-      <a class="icon-btn" href="#/profile" aria-label="Your profile"><span class="avatar">${nm ? esc(nm[0].toUpperCase()) : icon('user')}</span></a><a class="icon-btn" href="#/settings" aria-label="Settings">${icon('gear')}</a></div>
+    const searchOpen = route === 'discover' && (ses().searchOpen || ses().q);
+    return `<div class="shell"><header class="dock-wrap"><nav class="dock" aria-label="Primary">
+      ${tabs.map(([r, l]) => `<a class="dock-tab" href="#/${r}" ${here === r ? 'aria-current="page"' : ''}>${l}</a>`).join('')}
+      <span class="dock-sep" aria-hidden="true"></span>
+      <button class="dock-icon" data-action="toggle-search" aria-label="Search jobs" aria-expanded="${!!searchOpen}">${icon('search')}</button>
+      <div class="tools"><button class="dock-icon" data-action="notes" aria-label="Notifications${unread ? ` (${unread} unread)` : ''}" aria-expanded="${ses().notesOpen}">${icon('bell')}${unread ? '<span class="dot"></span>' : ''}</button>${pop}</div>
+      <a class="dock-icon" href="#/settings" aria-label="Settings">${icon('gear')}</a></nav></header>
+      <main id="main">
+      ${searchOpen ? `<form class="searchbar" role="search" data-form="search"><label class="sr" for="q">Search jobs</label>${icon('search')}<input id="q" type="search" placeholder="Search jobs, employers, cities" value="${esc(ses().q)}" autocomplete="off" enterkeyhint="search">${ses().q ? `<button type="button" class="clear" data-action="clear-search" aria-label="Clear search">${icon('x')}</button>` : ''}</form>` : ''}
+      <div class="topbar"><div class="titles"><div class="eyebrow">${esc(eyebrow)}</div>${title ? `<h1 class="page">${esc(title)}</h1>` : ''}</div></div>
       <div id="statusbar">${A.statusHTML()}</div>${inner}</main></div>`;
   }
 
@@ -181,24 +190,28 @@
     else if (!S().jobs.length) inner += emptyNoJobs();
     else {
       const chips = KJ.chips(p); if (!chips.includes(ses().cat)) ses().cat = 'For You';
+      const JOBS = A.filtered(), seg = (k, items) => `<div class="seg" role="group" aria-label="${k}">${items.map(([v, l]) => `<button data-action="set-${k}" data-v="${v}" aria-pressed="${ses()[k] === v}">${l}</button>`).join('')}</div>`;
+      inner += `<div class="filters">${seg('mode', [['all', 'All'], ['remote', 'Remote'], ['onsite', 'On-site']])}<button class="pillbtn" data-action="search-now">${icon('refresh')} Scan for opportunities</button></div>
+        <div class="flabel">Location</div><div class="chips lightchips" role="group" aria-label="Location">${[['anywhere', 'Anywhere'], ['near', 'Near me'], ['california', 'California'], ['remote', 'Remote'], ['outside', 'Outside California']].map(([v, l]) => `<button class="chip" data-action="set-where" data-v="${v}" aria-pressed="${ses().where === v}">${l}</button>`).join('')}</div>
+        <div class="flabel">Focus</div>`;
       inner += `<div class="chips" role="group" aria-label="Categories">${chips.map((c) => `<button class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${ses().cat === c}">${esc(c)}</button>`).join('')}</div>`;
       if (ses().q.trim()) {
-        const res = KJ.search(S().jobs, p, ses().q);
+        const res = KJ.search(JOBS, p, ses().q);
         inner += `<div class="sec-head" style="margin-top:20px"><div class="grow"><h2>${A.plural(res.length, 'result')} for “${esc(ses().q.trim())}”</h2><p>Search covers every listing you haven’t dismissed.</p></div></div>${res.length ? `<div class="grid">${res.map((j) => card(j)).join('')}</div>` : emptyFeed('search')}`;
       } else if (ses().cat === 'For You') {
-        const feed = KJ.buildFeed(S().jobs, p, { newIds: ses().newIds });
+        const feed = KJ.buildFeed(JOBS, p, { newIds: ses().newIds });
         if (!feed.featured) inner += emptyFeed('feed');
         else {
           inner += featuredCard(feed.featured, 'Featured opportunity') + feed.sections.map(section).join('') + careerSection();
           if (!feed.sections.some((s) => s.id === 'top')) inner += `<div class="banner" style="margin-top:28px">${icon('info')}<div class="grow"><b>Top Matches appear as you confirm qualifications.</b> Add education, experience and credentials so strong matches can be told apart from ones that need checking.<div class="acts"><a class="btn sm" href="#/profile">Complete profile</a></div></div></div>`;
         }
       } else {
-        const f = KJ.categoryFeed(S().jobs, p, ses().cat);
+        const f = KJ.categoryFeed(JOBS, p, ses().cat);
         inner += imageSlot(CAT_IMAGE[ses().cat], 'banner');
         inner += !f.featured ? emptyFeed('cat') : featuredCard(f.featured, ses().cat) + (f.rest.length ? `<section class="section"><div class="sec-head"><div class="grow"><h2>More in ${esc(ses().cat)}</h2><p>${A.plural(f.total, 'opportunity', 'opportunities')}, best matches first.</p></div></div><div class="grid">${f.rest.map((j) => card(j)).join('')}</div></section>` : '');
       }
     }
-    return shell('discover', p && p.name ? `${g}, ${p.name}` : g, date, inner, { search: true });
+    return shell('discover', p && p.name ? `${g}, ${p.name}` : g, date, inner);
   }
 
   /* ---------- saved / applications ---------- */
@@ -215,7 +228,7 @@
   function vApplications() {
     const apps = Object.values(S().apps).filter((a) => A.job(a.jobId)).sort((a, b) => b.updatedAt - a.updatedAt);
     const inner = apps.length ? `<p class="note">You track these yourself. Kother never sends an application or résumé to an employer.</p><div class="rows">${apps.map((a) => { const j = A.job(a.jobId), next = (a.interviews || []).filter((i) => i.date && i.date >= new Date().toISOString().slice(0, 10)).sort((x, y) => x.date.localeCompare(y.date))[0];
-      return rowCard(j, `<span class="chip-s s-${a.status}">${esc(APP_STATUS[a.status])}</span><button class="btn sm" data-action="track" data-id="${j.id}">Update</button>`, `<div class="sub">${a.appliedOn ? 'Applied ' + esc(A.fmtDate(a.appliedOn)) : 'Not applied yet'}${next ? ' · Interview ' + esc(A.fmtDate(next.date)) : ''}${a.response ? ' · ' + esc(a.response.slice(0, 60)) : ''}</div>`); }).join('')}</div>`
+      return rowCard(j, `<span class="chip-s s-${a.status}">${esc(APP_STATUS[a.status])}</span><button class="btn sm" data-action="track" data-id="${j.id}">Update</button><button class="btn sm" data-action="email-followup" data-id="${j.id}">Follow-up email</button>`, `<div class="sub">${a.appliedOn ? 'Applied ' + esc(A.fmtDate(a.appliedOn)) : 'Not applied yet'}${next ? ' · Interview ' + esc(A.fmtDate(next.date)) : ''}${a.response ? ' · ' + esc(a.response.slice(0, 60)) : ''}</div>`); }).join('')}</div>`
       : `<div class="empty">${icon('check')}<h2>No applications tracked</h2><p>After you apply on an employer’s site, open the job and tap “Mark as applied” to keep track of interviews, responses and notes here.</p><a class="btn primary" href="#/discover">Browse opportunities</a></div>`;
     return shell('applications', 'Applications', A.plural(apps.length, 'application') + ' tracked', inner);
   }
@@ -231,7 +244,7 @@
     const a = S().apps[j.id]; if (!a) return '';
     return `<section class="panel"><h2>Your application</h2><dl class="kv"><div><dt>Status</dt><dd>${esc(APP_STATUS[a.status])}</dd></div><div><dt>Applied</dt><dd>${a.appliedOn ? esc(A.fmtDate(a.appliedOn)) : 'Not yet'}</dd></div><div><dt>Employer response</dt><dd>${esc(a.response || '—')}</dd></div></dl>
       ${(a.interviews || []).length ? `<h3>Interviews</h3><ul>${a.interviews.map((i) => `<li>${esc(A.fmtDate(i.date))}${i.note ? ' — ' + esc(i.note) : ''}</li>`).join('')}</ul>` : ''}${a.notes ? `<h3>Notes</h3><p style="white-space:pre-line;margin:0">${esc(a.notes)}</p>` : ''}${a.closedReason ? `<p class="note">Closed: ${esc(a.closedReason)}</p>` : ''}
-      <div class="actions"><button class="btn" data-action="track" data-id="${j.id}">${icon('pencil')} Edit tracking</button></div></section>`;
+      <div class="actions"><button class="btn" data-action="track" data-id="${j.id}">${icon('pencil')} Edit tracking</button><button class="btn" data-action="email-followup" data-id="${j.id}">${icon('mail')} Write a follow-up email</button></div></section>`;
   }
   function vJob(id) {
     const j = A.job(id);
@@ -250,6 +263,7 @@
         <button class="btn ${saved ? 'on' : ''}" data-action="save" data-id="${j.id}" aria-pressed="${saved}">${icon('bookmark', saved ? 'fill' : '')} ${saved ? 'Saved' : 'Save job'}</button>
         <button class="btn ${app && app.status !== 'interested' ? 'on' : ''}" data-action="${app && app.status !== 'interested' ? 'track' : 'mark-applied'}" data-id="${j.id}">${icon('check')} ${app && app.status !== 'interested' ? `${esc(APP_STATUS[app.status])} · update` : 'Mark as applied'}</button>
         <button class="btn" data-action="dismiss-detail" data-id="${j.id}">${icon('x')} Not interested</button><button class="btn quiet" data-action="report" data-id="${j.id}">${icon('flag')} Report expired or incorrect</button></div></div>
+        ${A.emailPanel(j)}
         <div class="panel src-panel"><h2>Source</h2><dl class="kv one"><div><dt>Provider</dt><dd>${esc(A.providerName(j.provider))}</dd></div>${(j.alsoListed || []).length ? `<div><dt>Also listed by</dt><dd>${esc([...new Set(j.alsoListed.map((a) => A.providerName(a.provider)))].join(', '))}</dd></div>` : ''}<div><dt>Published</dt><dd>${j.published ? esc(A.fmtDate(j.published)) : 'Not available'}</dd></div><div><dt>First retrieved</dt><dd>${esc(A.fmtDate(new Date(j.firstSeen).toISOString()))}</dd></div><div><dt>Last verified</dt><dd>${j.lastVerified ? esc(A.fmtTs(j.lastVerified)) : 'Never'}</dd></div></dl>
         <p class="note verify ${j.verification}">${esc(verifyText)}</p></div></div>
       <div class="main-col" style="display:grid;gap:16px;min-width:0">
@@ -299,7 +313,7 @@
       <p class="note priv">${icon('lock')} Only job titles, categories and city names are sent to job sources — never your name, email, résumé or employers.</p></section>
       ${resumePanel()}
       <div class="sections">${comp.filter((c) => c.id !== 'resume').map((c) => { const m = A.SECTIONS[c.id]; return `<section class="sec-card"><div class="row1"><h3>${m.t}</h3>${c.done ? `<span class="status">${icon('check')}Complete</span>` : `<span class="status todo">${icon('dash')}Needs info</span>`}</div><p>${esc(m.sum(p))}</p><div class="actions"><button class="btn sm" data-action="edit" data-sec="${c.id}" aria-label="Edit ${m.t}">${c.done ? 'Edit' : 'Add info'}</button></div></section>`; }).join('')}</div>
-      <section class="panel" style="margin-top:18px"><h2>Your data</h2><p class="note" style="margin-top:0">Your profile and résumé are visible only to you. You can remove them at any time.</p><div class="actions"><button class="btn danger" data-action="delete-profile">Delete my profile data</button><button class="btn danger" data-action="delete-account">Delete my account</button></div></section>`;
+      <section class="panel" style="margin-top:18px"><h2>Your data</h2><p class="note" style="margin-top:0">Your profile and résumé are visible only to you. You can remove them at any time.</p><div class="actions"><a class="btn" href="#/settings">Settings</a><button class="btn danger" data-action="delete-profile">Delete my profile data</button><button class="btn danger" data-action="delete-account">Delete my account</button></div></section>`;
     return shell('profile', 'My Profile', 'Used to personalize your feed', inner);
   }
 

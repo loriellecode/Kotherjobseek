@@ -17,7 +17,7 @@ const root = path.join(__dirname, '..');
 
 /* Production safety: mock/stand-in provider endpoints are for automated tests only and must never serve the real app. */
 if (e.NODE_ENV === 'production') {
-  const official = { ADZUNA_BASE_URL: 'https://api.adzuna.com/v1/api', USAJOBS_BASE_URL: 'https://data.usajobs.gov/api', PEXELS_BASE_URL: 'https://api.pexels.com/v1' };
+  const official = { ADZUNA_BASE_URL: 'https://api.adzuna.com/v1/api', USAJOBS_BASE_URL: 'https://data.usajobs.gov/api', PEXELS_BASE_URL: 'https://api.pexels.com/v1', ANTHROPIC_BASE_URL: 'https://api.anthropic.com' };
   for (const [k, v] of Object.entries(official)) if (e[k] && e[k] !== v) throw new Error(`${k} must not be overridden in production (found a non-official URL). Remove it from the environment.`);
 }
 
@@ -42,6 +42,7 @@ module.exports = {
     usajobs: { key: e.USAJOBS_API_KEY, email: e.USAJOBS_USER_EMAIL, base: e.USAJOBS_BASE_URL || 'https://data.usajobs.gov/api', dailyBudget: int(e.USAJOBS_DAILY_BUDGET, 200) },
     feeds: { file: path.resolve(e.EMPLOYER_FEEDS_FILE || path.join(root, 'config', 'employer-feeds.json')), userAgent: e.FEED_USER_AGENT || 'KotherJobSearch/1.0', contact: e.FEED_CONTACT_URL || '' },
   },
+  ai: { key: e.ANTHROPIC_API_KEY, base: e.ANTHROPIC_BASE_URL || 'https://api.anthropic.com', model: e.EMAIL_AI_MODEL || 'claude-sonnet-5-5' },
   pexels: { key: e.PEXELS_API_KEY, base: e.PEXELS_BASE_URL || 'https://api.pexels.com/v1' },
   push: { publicKey: e.VAPID_PUBLIC_KEY, privateKey: e.VAPID_PRIVATE_KEY, subject: e.VAPID_SUBJECT || 'mailto:admin@example.com' },
 };

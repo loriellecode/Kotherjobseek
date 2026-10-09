@@ -3,7 +3,7 @@
 const { now, j, tx } = require('./db');
 const config = require('./config');
 
-const COLS = ['title', 'employer', 'city', 'state', 'location_text', 'neighborhood', 'lat', 'lon', 'arrangement', 'remote', 'salary_min', 'salary_max', 'salary_period', 'salary_estimated', 'comp_note', 'employment_type', 'description', 'summary', 'required', 'preferred', 'edu_level', 'edu_inferred', 'edu_preferred', 'exp_years', 'exp_field', 'exp_inferred', 'exp_preferred', 'certs', 'categories', 'apply_url', 'link_level', 'link_notes', 'logo_url', 'published', 'deadline', 'retrieved_at', 'raw_hash'];
+const COLS = ['title', 'employer', 'city', 'state', 'location_text', 'neighborhood', 'lat', 'lon', 'arrangement', 'remote', 'salary_min', 'salary_max', 'salary_period', 'salary_estimated', 'comp_note', 'employment_type', 'description', 'summary', 'required', 'preferred', 'edu_level', 'edu_inferred', 'edu_preferred', 'exp_years', 'exp_field', 'exp_inferred', 'exp_preferred', 'certs', 'categories', 'apply_url', 'link_level', 'link_notes', 'email_apply', 'logo_url', 'published', 'deadline', 'retrieved_at', 'raw_hash'];
 
 function upsertJob(db, n, t) {
   t = t || now();
@@ -61,7 +61,7 @@ function jobView(row, t) {
     lat: row.lat, lon: row.lon, arrangement: row.arrangement, remote: !!row.remote, salaryMin: row.salary_min, salaryMax: row.salary_max, salaryPeriod: row.salary_period || 'year', salaryEstimated: !!row.salary_estimated, compNote: row.comp_note,
     type: row.employment_type, description: row.description, summary: row.summary, required: j(row.required, []), preferred: j(row.preferred, []),
     education: row.edu_level ? { level: row.edu_level, inferred: !!row.edu_inferred, preferred: !!row.edu_preferred } : null, experience: row.exp_years ? { years: row.exp_years, field: row.exp_field, inferred: !!row.exp_inferred, preferred: !!row.exp_preferred } : null,
-    certifications: j(row.certs, []), categories: j(row.categories, []), applyUrl: row.apply_url, link: Object.assign({ level: row.link_level || (row.apply_url ? 'caution' : null) }, j(row.link_notes, { host: '', notes: [] })), logoUrl: row.logo_url, published: row.published, deadline: row.deadline,
+    certifications: j(row.certs, []), categories: j(row.categories, []), applyUrl: row.apply_url, link: Object.assign({ level: row.link_level || (row.apply_url ? 'caution' : null) }, j(row.link_notes, { host: '', notes: [] })), emailApply: j(row.email_apply, null), logoUrl: row.logo_url, published: row.published, deadline: row.deadline,
     retrievedAt: row.retrieved_at, firstSeen: row.first_seen, lastSeen: row.last_seen, lastVerified: row.last_verified, status: row.status, verification: verification(row, t), alsoListed: j(row.also_listed, []),
   };
 }

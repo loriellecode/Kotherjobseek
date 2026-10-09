@@ -8,6 +8,7 @@ const { now, j } = require('./db');
 
 const TOPICS = {
   finance: 'finance accounting desk', business: 'business meeting office', education: 'classroom teacher students', 'special education': 'teacher helping student classroom',
+  workforce: 'career counseling job seeker interview', banking: 'bank teller customer service',
   'professional development': 'professional learning workshop', 'career growth': 'career growth professional', 'remote work': 'working from home laptop', workplace: 'modern office workplace',
 };
 const TTL = 7 * 864e5;

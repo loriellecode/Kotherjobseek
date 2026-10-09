@@ -4,7 +4,7 @@
   const KJ = (window.KJ = window.KJ || {});
   const A = (KJ.A = {
     S: { user: null, profile: null, jobs: [], apps: {}, status: null, providers: [], config: {}, notes: [], unread: 0, offline: false, loaded: false },
-    session: { cat: 'For You', q: '', newIds: new Set(), notesOpen: false, applyNote: '', error: '', flash: null, images: {}, lastFocus: null },
+    session: { cat: 'For You', q: '', searchOpen: false, mode: 'all', where: 'anywhere', newIds: new Set(), notesOpen: false, applyNote: '', error: '', flash: null, images: {}, lastFocus: null },
   });
 
   A.esc = (s) => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -14,6 +14,7 @@
     x: '<path d="M6 6l12 12M18 6 6 18"/>', left: '<path d="m15 5-7 7 7 7"/>', right: '<path d="m9 5 7 7-7 7"/>', user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
     compass: '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>', check: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>', ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/>',
     flag: '<path d="M5 21V4h11l-1 4 1 4H5"/>', gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>', copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>',
     pencil: '<path d="m4 20 1-4L16 5l3 3L8 19z"/>', alert: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17v.5"/>', plug: '<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/>',
     plus: '<path d="M12 5v14M5 12h14"/>', info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.5"/>', dash: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
     refresh: '<path d="M20 11a8 8 0 1 0-2 6"/><path d="M20 4v7h-7"/>', trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', upload: '<path d="M12 16V4M7 9l5-5 5 5M5 20h14"/>', lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
@@ -32,6 +33,16 @@
   A.shortWhere = (j) => (j.remote ? 'Remote' : j.neighborhood || j.city || j.locationText || 'Location not listed');
   A.pay = (j) => (KJ.salaryParts(j) || {}).main || 'Salary not listed';
   A.payAlt = (j) => { const p = KJ.salaryParts(j); return p ? p.alt : ''; }; // the hourly (or yearly) equivalent
+  const CAT_TOPIC = { Finance: 'finance', Business: 'business', Education: 'education', 'Special Education': 'special education', 'Workforce Development': 'workforce', Banking: 'banking' };
+  A.CAT_COLOR = { Finance: '#0b7a53', Business: '#1d5fd1', Education: '#d62f5a', 'Special Education': '#7a3fd0', 'Workforce Development': '#b45f06', Banking: '#0e7c86' };
+  A.topicFor = (j) => (j.categories && CAT_TOPIC[j.categories[0]]) || (j.remote ? 'remote work' : 'workplace');
+  const inCA = (j) => /^(ca|california)$/i.test(String(j.state || '').trim()) || /,\s*(ca|california)\b/i.test(j.locationText || '');
+  /* Arrangement + location filters from the Discover header (applied before the feed is laid out). */
+  A.filtered = () => A.S.jobs.filter((j) => {
+    const s = A.session; if (s.mode === 'remote' && !j.remote) return false; if (s.mode === 'onsite' && j.remote) return false;
+    if (s.where === 'near') return !!(j.match && KJ.isNearby(j.match)); if (s.where === 'california') return j.remote ? false : inCA(j);
+    if (s.where === 'outside') return !j.remote && !inCA(j); if (s.where === 'remote') return !!j.remote; return true;
+  });
   A.PROVIDER_NAMES = { adzuna: 'Adzuna', usajobs: 'USAJOBS', feeds: 'Employer career page', import: 'Imported file' };
   A.providerName = (p) => A.PROVIDER_NAMES[p] || p;
 
