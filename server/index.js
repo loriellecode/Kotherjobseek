@@ -13,6 +13,7 @@ const notify = require('./notify');
 const providers = require('./providers');
 const { Pipeline } = require('./pipeline');
 const { feedFor, rematchUser } = require('./matcher');
+const careersEngine = require('./careers');
 const { normalizeListing } = require('./normalize');
 const { upsertJob, jobView } = require('./jobs');
 
@@ -41,7 +42,7 @@ function createApp(db, pipeline) {
     const b = await H.readJson(req), email = auth.validateCreds(b.email, b.password);
     if (db.prepare('SELECT 1 FROM users WHERE email=?').get(email)) throw new H.HttpError(409, 'An account with that email already exists.');
     const id = Number(db.prepare('INSERT INTO users(email,pw_hash,created_at) VALUES(?,?,?)').run(email, await auth.hashPassword(b.password), now()).lastInsertRowid);
-    P.ensureProfile(db, id); setSession(res, id); H.send(res, 201, { user: { id, email } });
+    P.ensureProfile(db, id); const seeded = P.applyInitialProfile(db, id); if (seeded.applied) pipeline.enqueue(id, { classes: ['broad', 'location'], reason: 'profile', revision: seeded.revision }); setSession(res, id); H.send(res, 201, { user: { id, email } });
   }, { public: true });
   route('POST', '/api/auth/login', async (req, res) => {
     loginLimit(H.clientIp(req));
@@ -56,7 +57,7 @@ function createApp(db, pipeline) {
   /* ---- bootstrap ---- */
   route('GET', '/api/bootstrap', (req, res) => {
     const u = req.user; P.ensureProfile(db, u.id);
-    H.send(res, 200, { user: u, profile: P.getProfile(db, u.id), status: statusOf(u.id), providers: providerStatus(), unread: unread(u.id), config: { pushPublicKey: notify.pushStatus().configured ? config.push.publicKey : null, imagery: imagery.status(), email: notify.emailStatus().configured }, serverTime: now() });
+    H.send(res, 200, { user: u, profile: P.getProfile(db, u.id), status: statusOf(u.id), providers: providerStatus(), unread: unread(u.id), config: { pushPublicKey: notify.pushStatus().configured ? config.push.publicKey : null, imagery: imagery.status() }, serverTime: now() });
   });
   route('GET', '/api/feed', (req, res) => H.send(res, 200, { jobs: feedFor(db, req.user.id), status: statusOf(req.user.id) }));
 
@@ -77,24 +78,35 @@ function createApp(db, pipeline) {
   route('POST', '/api/resume', async (req, res) => {
     const name = decodeURIComponent(String(req.headers['x-filename'] || 'resume'));
     const buf = await H.readBody(req, config.maxResumeBytes + 1024);
-    const r = await resume.saveResume(db, req.user.id, name, buf);
-    H.send(res, 201, Object.assign(r, { note: 'Nothing has been added to your profile yet. Review the suggestions below.' }));
+    const st = await resume.saveResume(db, req.user.id, name, buf);
     rematchUser(db, req.user.id); // résumé text can confirm free-text requirements
+    H.send(res, 201, Object.assign(st, { note: 'Nothing has been added to your profile yet. Review the suggestions first.' }));
   });
-  route('GET', '/api/resume', (req, res) => H.send(res, 200, { resume: P.getProfile(db, req.user.id).resume, proposals: resume.listProposals(db, req.user.id) }));
-  route('GET', '/api/resume/file', (req, res) => { const f = resume.resumeFile(db, req.user.id); H.send(res, 200, fs.readFileSync(f.file), { 'Content-Type': f.mime, 'Content-Disposition': `attachment; filename="${f.filename.replace(/"/g, '')}"` }); });
-  route('DELETE', '/api/resume', (req, res) => { resume.removeResume(db, req.user.id); rematchUser(db, req.user.id); H.send(res, 200, { ok: true }); });
+  route('GET', '/api/resume', (req, res) => H.send(res, 200, resume.state(db, req.user.id)));
+  route('POST', '/api/resume/retry', async (req, res) => H.send(res, 200, await resume.retry(db, req.user.id)));
+  route('GET', '/api/resume/file', (req, res) => { const f = resume.resumeFile(db, req.user.id); H.send(res, 200, fs.readFileSync(f.file), { 'Content-Type': f.mime, 'Content-Disposition': `attachment; filename="${f.filename.replace(/["\\]/g, '')}"`, 'Cache-Control': 'private, no-store' }); });
+  route('DELETE', '/api/resume', (req, res) => { const r = resume.removeResume(db, req.user.id); rematchUser(db, req.user.id); H.send(res, 200, r); });
+  route('POST', '/api/resume/finish', (req, res) => H.send(res, 200, resume.finish(db, req.user.id)));
   route('POST', '/api/resume/proposals/:id/:action', async (req, res, m) => {
     if (!['accept', 'reject'].includes(m.action)) throw new H.HttpError(404, 'Not found');
     const b = await H.readJson(req).catch(() => ({}));
-    const r = resume.decideProposal(db, req.user.id, Number(m.id), m.action === 'accept', b.data);
-    H.send(res, 200, r ? afterChange(req.user.id, r) : { ok: true, proposals: resume.listProposals(db, req.user.id) });
+    let r; try { r = resume.decideProposal(db, req.user.id, Number(m.id), m.action === 'accept', b); } catch (e) { if (e.status === 409) return H.send(res, 409, { error: e.message, conflict: e.extra.conflict }); throw e; }
+    if (r) { r.classes = [...new Set([...r.classes, 'resume'])]; H.send(res, 200, Object.assign(afterChange(req.user.id, r), resume.state(db, req.user.id))); } else H.send(res, 200, Object.assign({ ok: true }, resume.state(db, req.user.id)));
+  });
+
+  /* ---- career expansion ---- */
+  route('GET', '/api/careers', (req, res) => H.send(res, 200, careersEngine.compute(db, req.user.id)));
+  route('PUT', '/api/careers/:id', async (req, res, m) => {
+    const b = await H.readJson(req); if (!['include', 'exclude', 'clear'].includes(b.state)) throw new H.HttpError(400, 'state must be include, exclude or clear');
+    if (!careersEngine.setState(db, req.user.id, m.id, b.state)) throw new H.HttpError(404, 'Unknown career');
+    const r = P.touch(db, req.user.id, ['broad'], ['career paths']); pipeline.enqueue(req.user.id, { classes: ['broad'], reason: 'profile', revision: r.revision });
+    H.send(res, 200, Object.assign(careersEngine.compute(db, req.user.id), { status: statusOf(req.user.id) }));
   });
 
   /* ---- search ---- */
   route('POST', '/api/search/run', (req, res) => { pipeline.enqueue(req.user.id, { reason: 'manual', force: true, search: true }); H.send(res, 202, { status: statusOf(req.user.id) }); });
   route('GET', '/api/search/status', (req, res) => H.send(res, 200, { status: statusOf(req.user.id) }));
-  route('GET', '/api/providers', (req, res) => H.send(res, 200, { providers: providerStatus(), imagery: imagery.status(), email: notify.emailStatus(), push: notify.pushStatus() }));
+  route('GET', '/api/providers', (req, res) => H.send(res, 200, { providers: providerStatus(), imagery: imagery.status(), push: notify.pushStatus() }));
 
   function providerStatus() {
     const dayStart = now() - 864e5;
@@ -156,7 +168,9 @@ function createApp(db, pipeline) {
     const b = await H.readJson(req); const s = b.subscription || b;
     if (!notify.pushStatus().configured) throw new H.HttpError(501, 'Web push is not configured on this server (VAPID keys missing).');
     if (!s.endpoint || !/^https:\/\//.test(s.endpoint) || !s.keys || !s.keys.p256dh || !s.keys.auth) throw new H.HttpError(400, 'Invalid push subscription.');
-    db.prepare('INSERT INTO push_subscriptions(user_id,endpoint,p256dh,auth,created_at) VALUES(?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id, p256dh=excluded.p256dh, auth=excluded.auth').run(req.user.id, s.endpoint, s.keys.p256dh, s.keys.auth, now());
+    const owner = db.prepare('SELECT user_id FROM push_subscriptions WHERE endpoint=?').get(s.endpoint);
+    if (owner && owner.user_id !== req.user.id) throw new H.HttpError(409, 'That device is already registered to another account.');
+    db.prepare('INSERT INTO push_subscriptions(user_id,endpoint,p256dh,auth,created_at) VALUES(?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh, auth=excluded.auth').run(req.user.id, s.endpoint, s.keys.p256dh, s.keys.auth, now());
     H.send(res, 201, { subscribed: true });
   });
   route('DELETE', '/api/push/subscribe', async (req, res) => { const b = await H.readJson(req).catch(() => ({})); if (b.endpoint) db.prepare('DELETE FROM push_subscriptions WHERE user_id=? AND endpoint=?').run(req.user.id, b.endpoint); else db.prepare('DELETE FROM push_subscriptions WHERE user_id=?').run(req.user.id); H.send(res, 200, { subscribed: false }); });
@@ -206,6 +220,6 @@ function start(opts = {}) {
 if (require.main === module) start({ host: process.env.HOST || '0.0.0.0' }).then(({ port }) => {
   console.log(`Kother job discovery listening on port ${port}`);
   for (const p of providers) { const c = p.configured(); console.log(`  source ${p.name}: ${c.ok ? 'configured' : 'NOT configured — missing ' + c.missing.join(', ')}`); }
-  console.log(`  imagery (Pexels): ${imagery.status().configured ? 'configured' : 'not configured'}; email: ${notify.emailStatus().configured ? 'configured' : 'not configured'}; web push: ${notify.pushStatus().configured ? 'configured' : 'not configured'}`);
+  console.log(`  imagery (Pexels): ${imagery.status().configured ? 'configured' : 'not configured'}; web push: ${notify.pushStatus().configured ? 'configured' : 'not configured'}`);
 });
 module.exports = { start, createApp };

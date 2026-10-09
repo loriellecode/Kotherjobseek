@@ -15,6 +15,12 @@ const e = process.env;
 const int = (v, d) => (v !== undefined && v !== '' && !isNaN(Number(v)) ? Number(v) : d);
 const root = path.join(__dirname, '..');
 
+/* Production safety: mock/stand-in provider endpoints are for automated tests only and must never serve the real app. */
+if (e.NODE_ENV === 'production') {
+  const official = { ADZUNA_BASE_URL: 'https://api.adzuna.com/v1/api', USAJOBS_BASE_URL: 'https://data.usajobs.gov/api', PEXELS_BASE_URL: 'https://api.pexels.com/v1' };
+  for (const [k, v] of Object.entries(official)) if (e[k] && e[k] !== v) throw new Error(`${k} must not be overridden in production (found a non-official URL). Remove it from the environment.`);
+}
+
 module.exports = {
   root,
   port: int(e.PORT, 3000),
@@ -28,7 +34,7 @@ module.exports = {
   scanIntervalHours: int(e.SCAN_INTERVAL_HOURS, 6),
   schedulerEnabled: e.SCHEDULER_ENABLED !== 'false',
   minRepeatSearchMinutes: int(e.MIN_REPEAT_SEARCH_MINUTES, 360),
-  maxQueriesPerScan: int(e.MAX_QUERIES_PER_SCAN, 24),
+  maxQueriesPerScan: int(e.MAX_QUERIES_PER_SCAN, 36),
   staleAfterDays: int(e.STALE_AFTER_DAYS, 14),
   verifiedWithinDays: int(e.VERIFIED_WITHIN_DAYS, 3),
   providers: {
@@ -37,6 +43,5 @@ module.exports = {
     feeds: { file: path.resolve(e.EMPLOYER_FEEDS_FILE || path.join(root, 'config', 'employer-feeds.json')), userAgent: e.FEED_USER_AGENT || 'KotherJobSearch/1.0', contact: e.FEED_CONTACT_URL || '' },
   },
   pexels: { key: e.PEXELS_API_KEY, base: e.PEXELS_BASE_URL || 'https://api.pexels.com/v1' },
-  mail: { host: e.SMTP_HOST, port: int(e.SMTP_PORT, 587), user: e.SMTP_USER, pass: e.SMTP_PASS, from: e.MAIL_FROM, secure: e.SMTP_SECURE === 'true', json: e.MAIL_TRANSPORT === 'json' },
   push: { publicKey: e.VAPID_PUBLIC_KEY, privateKey: e.VAPID_PRIVATE_KEY, subject: e.VAPID_SUBJECT || 'mailto:admin@example.com' },
 };

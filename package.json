@@ -8,11 +8,13 @@
   },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "seed": "node --disable-warning=ExperimentalWarning scripts/seed-profile.js",
+    "reset-password": "node --disable-warning=ExperimentalWarning scripts/reset-password.js",
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
   },
   "dependencies": {
+    "jszip": "^3.10.2",
     "mammoth": "^1.13.0",
-    "nodemailer": "^10.0.16",
     "pdf-parse": "^1.1.1",
     "web-push": "^3.6.7"
   }

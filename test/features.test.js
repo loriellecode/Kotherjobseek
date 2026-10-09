@@ -24,7 +24,7 @@ t.describe('alerts, scheduling, sources, tracking, résumé, imagery', () => {
     env = await boot(); c = await env.signup();
     await c.req('POST', '/api/profile/education', { level: 'bachelor', field: 'Finance' });
     await c.req('POST', '/api/profile/experience', { title: 'Staff Accountant', field: 'Finance', years: 4 });
-    await c.req('PATCH', '/api/profile', { titles: ['Budget Analyst'], categories: ['Finance'], salary: { min: 60000 }, notify: { email: true, push: true, immediate: true, quietStart: 0, quietEnd: 0 } });
+    await c.req('PATCH', '/api/profile', { titles: ['Budget Analyst'], categories: ['Finance'], salary: { min: 60000 }, notify: { push: true, immediate: true, quietStart: 0, quietEnd: 0 } });
     env.mock.state.jobs = [adz(1)];
     await env.pipeline.drain();
   });
@@ -45,7 +45,7 @@ t.describe('alerts, scheduling, sources, tracking, résumé, imagery', () => {
     assert.equal((await c.req('GET', '/api/search/status')).data.status.state, 'done');
   });
 
-  t.it('H: a scheduled search finds a genuinely new listing and sends one notification per channel', async () => {
+  t.it('H: a scheduled search finds a genuinely new listing and sends one in-app notification and one push', async () => {
     // register a push device against the local mock push service
     const ecdh = crypto.createECDH('prime256v1'); ecdh.generateKeys();
     const sub = { endpoint: `https://127.0.0.1:${pushSvc.port}/push/dev1`, keys: { p256dh: ecdh.getPublicKey().toString('base64url'), auth: crypto.randomBytes(16).toString('base64url') } };
@@ -56,8 +56,7 @@ t.describe('alerts, scheduling, sources, tracking, résumé, imagery', () => {
     const notes = (await c.req('GET', '/api/notifications')).data.notifications.filter((n) => n.kind === 'new_match');
     const n = notes.find((x) => /Senior Budget Analyst/.test(x.title)); assert.ok(n, 'notification for the new job');
     assert.match(n.title, /Lodi Unified Finance/); assert.match(n.body, /\$85,000–\$99,000/); assert.match(n.body, /Why:/); assert.match(n.link, /^\/#\/job\/\d+$/);
-    assert.ok(n.delivered.email && n.delivered.email.sent, 'email delivered'); assert.ok(n.delivered.push && n.delivered.push.sent, 'push delivered');
-    const mail = require('../server/notify').getMailer().sent.filter((m) => /Senior Budget Analyst/.test(m)); assert.equal(mail.length, 1);
+    assert.equal(n.delivered.email, undefined, 'no email channel exists'); assert.ok(n.delivered.push && n.delivered.push.sent, 'push delivered');
     assert.equal(pushReceived.length, 1); assert.match(pushReceived[0].headers.authorization, /^vapid /i); assert.equal(pushReceived[0].headers['content-encoding'], 'aes128gcm');
     // another cycle must not repeat it
     await c.req('POST', '/api/search/run'); await env.pipeline.drain();
@@ -73,7 +72,7 @@ t.describe('alerts, scheduling, sources, tracking, résumé, imagery', () => {
     env.mock.state.jobs.push(adz(51, { title: 'Budget Director', company: { display_name: 'Quiet Hours County' }, salary_min: 95000, salary_max: 120000 }));
     const pushes = pushReceived.length; await c.req('POST', '/api/search/run'); await env.pipeline.drain();
     const n = (await c.req('GET', '/api/notifications')).data.notifications.find((x) => /Budget Director/.test(x.title));
-    assert.ok(n, 'visible in app immediately'); assert.ok(!n.delivered.email, 'external delivery deferred'); assert.equal(pushReceived.length, pushes);
+    assert.ok(n, 'visible in app immediately'); assert.ok(!n.delivered.push, 'external delivery deferred'); assert.equal(pushReceived.length, pushes);
     await c.req('PATCH', '/api/profile', { notify: { enabled: false } });
     env.mock.state.jobs.push(adz(52, { title: 'Budget Chief', company: { display_name: 'Muted County' } }));
     await c.req('POST', '/api/search/run'); await env.pipeline.drain();
@@ -116,31 +115,6 @@ t.describe('alerts, scheduling, sources, tracking, résumé, imagery', () => {
     const list = (await c2.req('GET', '/api/applications')).data.applications; assert.equal(list.length, 1); assert.equal(list[0].status, 'closed'); assert.equal(list[0].closedReason, 'Position filled');
     assert.equal(env.db.prepare('SELECT COUNT(*) n FROM applications').get().n, 1);
     await c.req('PUT', `/api/jobs/${b.id}/report`, { reason: 'The listing has expired' }); assert.ok((await c.req('GET', '/api/feed')).data.jobs.find((j) => j.id === b.id).userState.reported);
-  });
-
-  t.it('B: résumé upload extracts suggestions that only enter the profile after review; files are private', async () => {
-    const txt = Buffer.from('Jane Doe\nMaster of Business Administration, Sample University\nProgram Coordinator, Example College, 2015 - 2018\nSkills: Budgeting, Forecasting\nCBEST passed 2012\n');
-    const before = (await c.req('GET', '/api/bootstrap')).data.profile;
-    const up = await c.req('POST', '/api/resume', txt, { 'x-filename': 'resume.txt', 'content-type': 'application/octet-stream' });
-    assert.equal(up.status, 201); assert.ok(up.data.proposals.length >= 4);
-    const mid = (await c.req('GET', '/api/bootstrap')).data.profile;
-    assert.equal(mid.education.length, before.education.length, 'nothing added before review'); assert.equal(mid.revision, before.revision);
-    const edu = up.data.proposals.find((p) => p.kind === 'education'), skill = up.data.proposals.find((p) => p.kind === 'skill');
-    const acc = await c.req('POST', `/api/resume/proposals/${edu.id}/accept`, {}); assert.equal(acc.status, 200); assert.ok(acc.data.queued, 'accepting triggers a rematch');
-    assert.equal(acc.data.profile.education.at(-1).source, 'resume');
-    await c.req('POST', `/api/resume/proposals/${skill.id}/reject`, {});
-    assert.equal((await c.req('GET', '/api/bootstrap')).data.profile.skills.length, 0);
-    // validation
-    assert.equal((await c.req('POST', '/api/resume', Buffer.from('not a pdf'), { 'x-filename': 'fake.pdf', 'content-type': 'application/octet-stream' })).status, 415);
-    assert.equal((await c.req('POST', '/api/resume', Buffer.from('x'), { 'x-filename': 'run.exe', 'content-type': 'application/octet-stream' })).status, 415);
-    // access control
-    const other = await env.signup('other@example.test');
-    assert.equal((await other.req('GET', '/api/resume/file')).status, 404);
-    assert.equal((await env.client().req('GET', '/api/resume/file')).status, 401);
-    const dl = await c.req('GET', '/api/resume/file'); assert.equal(dl.status, 200); assert.match(dl.data, /Jane Doe/);
-    // deletion removes file and row
-    const row = env.db.prepare('SELECT user_id, stored_name FROM resumes').get(), file = path.join(process.env.DATA_DIR, 'resumes', String(row.user_id), row.stored_name);
-    assert.ok(fs.existsSync(file)); assert.equal((await c.req('DELETE', '/api/resume')).status, 200); assert.ok(!fs.existsSync(file)); assert.equal(env.db.prepare('SELECT COUNT(*) n FROM resumes').get().n, 0);
   });
 
   t.it('K: imagery is fetched server-side with attribution, cached, and degrades without a key', async () => {

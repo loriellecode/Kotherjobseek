@@ -1,21 +1,13 @@
 'use strict';
-/* Notifications: in-app records (always the source of truth), plus optional email (SMTP) and web push (VAPID).
+/* Notifications: in-app records (always the source of truth) plus optional web push (VAPID). There is NO email channel.
  * Quiet hours, categories, immediate/daily/weekly and per-channel switches all come from the user's profile. */
 const config = require('./config');
 const { now, j } = require('./db');
 const { getProfile } = require('./profile');
 const KJ = require('../shared/match');
 
-let mailer = null, webpush = null;
-function emailStatus() { return config.mail.json ? { configured: true, mode: 'json (test)' } : config.mail.host && config.mail.from ? { configured: true, mode: 'smtp' } : { configured: false, missing: ['SMTP_HOST', 'MAIL_FROM'].filter((k) => !process.env[k]) }; }
+let webpush = null;
 function pushStatus() { const p = config.push; return p.publicKey && p.privateKey ? { configured: true } : { configured: false, missing: ['VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY'].filter((k) => !process.env[k]) }; }
-function getMailer() {
-  if (mailer) return mailer;
-  const nodemailer = require('nodemailer');
-  mailer = config.mail.json ? nodemailer.createTransport({ jsonTransport: true }) : nodemailer.createTransport({ host: config.mail.host, port: config.mail.port, secure: config.mail.secure, auth: config.mail.user ? { user: config.mail.user, pass: config.mail.pass } : undefined });
-  mailer.sent = mailer.sent || [];
-  return mailer;
-}
 function getPush() { if (!webpush) { webpush = require('web-push'); webpush.setVapidDetails(config.push.subject, config.push.publicKey, config.push.privateKey); } return webpush; }
 
 /* ---- time helpers ---- */
@@ -89,11 +81,6 @@ async function deliverDue(db, t) {
     const d = j(n.delivered, {}), p = getProfile(db, n.user_id), pref = p.notify;
     let dirty = false;
     const skip = !pref.enabled || (n.kind === 'new_match' && !pref.immediate); // new matches go out in digests only when immediate alerts are off
-    if (!skip && pref.email && !d.email) {
-      if (!emailStatus().configured) { d.email = { error: 'email not configured' }; }
-      else try { const info = await getMailer().sendMail({ from: config.mail.from || 'jobs@localhost', to: n.email, subject: n.title, text: `${n.body}\n\n${config.publicUrl}${n.link || ''}\n\nChange alerts in your profile's notification preferences.` }); d.email = { sent: t }; if (config.mail.json) (getMailer().sent = getMailer().sent || []).push(info.message); } catch (e) { d.email = { error: String(e.message).slice(0, 200) }; }
-      dirty = true;
-    }
     if (!skip && pref.push && !d.push) {
       const subs = db.prepare('SELECT * FROM push_subscriptions WHERE user_id=?').all(n.user_id);
       if (!pushStatus().configured) d.push = { error: 'push not configured' };
@@ -109,4 +96,4 @@ async function deliverDue(db, t) {
   }
   return results;
 }
-module.exports = { emailStatus, pushStatus, create, notifyNewMatch, notifyProfileUpdate, notifyJobChanged, notifySourceIssue, notifyDeadlines, maybeDigest, deliverDue, inQuiet, nextAllowed, localHour, describeJob, getMailer };
+module.exports = { pushStatus, create, notifyNewMatch, notifyProfileUpdate, notifyJobChanged, notifySourceIssue, notifyDeadlines, maybeDigest, deliverDue, inQuiet, nextAllowed, localHour, describeJob };

@@ -1,80 +1,118 @@
 'use strict';
-/* Résumé handling: validated upload, private storage, text extraction, and *proposed* profile entries
- * that only enter the verified profile after the user reviews and accepts them. */
+/* Résumé handling.
+ *  - Validation is on the server and does not trust the filename or browser content type (extension AND file signature AND structure).
+ *  - Files live in DATA_DIR/resumes/<userId>/<random>, never in a public directory; only the owner can download them.
+ *  - Extraction is local (pdf-parse / mammoth). No résumé content is sent to any external service.
+ *  - Analysis only PROPOSES profile entries. The user accepts, edits or rejects each one; verified records are never silently overwritten. */
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const config = require('./config');
 const { now, j, tx } = require('./db');
 const { HttpError } = require('./http');
-const { addRecord } = require('./profile');
+const P = require('./profile');
+const { analyze } = require('./resumeAnalysis');
 
-const TYPES = { '.txt': 'text/plain', '.md': 'text/markdown', '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
+const TYPES = { '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' };
 const dirFor = (userId) => path.join(config.dataDir, 'resumes', String(userId));
+const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const withTimeout = (p, ms, msg) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))]);
 
-function sniff(ext, buf) {
-  if (ext === '.pdf') return buf.slice(0, 5).toString() === '%PDF-';
-  if (ext === '.docx') return buf[0] === 0x50 && buf[1] === 0x4b;
-  return !buf.slice(0, 4096).includes(0); // text files must not contain NUL bytes
-}
-async function extractText(ext, buf) {
+async function validate(ext, buf) {
+  if (!TYPES[ext]) throw new HttpError(415, 'Please upload a PDF or Word (.docx) résumé.');
+  if (!buf.length) throw new HttpError(400, 'The file is empty.');
+  if (buf.length > config.maxResumeBytes) throw new HttpError(413, `Résumés must be smaller than ${Math.round(config.maxResumeBytes / 1048576)} MB.`);
+  if (ext === '.pdf') { if (buf.slice(0, 5).toString('latin1') !== '%PDF-') throw new HttpError(415, 'That file isn’t a real PDF (its contents don’t match its name).'); return; }
+  if (!(buf[0] === 0x50 && buf[1] === 0x4b && (buf[2] === 3 || buf[2] === 5))) throw new HttpError(415, 'That file isn’t a real Word document (its contents don’t match its name).');
   try {
-    if (ext === '.txt' || ext === '.md') return buf.toString('utf8');
-    if (ext === '.pdf') { const pdf = require('pdf-parse/lib/pdf-parse.js'); return (await pdf(buf)).text || ''; }
-    if (ext === '.docx') return (await require('mammoth').extractRawText({ buffer: buf })).value || '';
-  } catch (_) { /* unreadable: stored, but no text available */ }
-  return '';
+    const zip = await require('jszip').loadAsync(buf), names = Object.keys(zip.files);
+    if (names.length > 3000 || !zip.file('word/document.xml')) throw new Error('structure');
+    const unpacked = names.reduce((t, n) => t + ((zip.files[n]._data && zip.files[n]._data.uncompressedSize) || 0), 0);
+    if (unpacked > 60 * 1024 * 1024) throw new Error('too large when unpacked'); // zip-bomb guard
+  } catch (_) { throw new HttpError(415, 'That file isn’t a readable .docx Word document.'); }
+}
+/* IMPORTANT: Node serves small Buffers from a shared memory pool. The bundled pdf.js ignores a Buffer's byteOffset and would read neighbouring
+ * memory (other uploads!) — giving random failures and potentially another person's text. Always hand it a standalone copy. */
+const standalone = (buf) => { const u = new Uint8Array(buf.length); u.set(buf); return u; };
+async function extractText(ext, buf) {
+  if (ext === '.pdf') { const pdf = require('pdf-parse/lib/pdf-parse.js'); const r = await withTimeout(pdf(standalone(buf), { max: 30 }), 25000, 'timeout'); return r.text || ''; }
+  const r = await withTimeout(require('mammoth').extractRawText({ buffer: buf }), 25000, 'timeout'); return r.value || '';
 }
 
-/* ---- heuristic extraction -> proposals (never auto-applied) ---- */
-const DEG = [['doctorate', /\b(ph\.?\s?d\.?|doctor(ate)? of [a-z ]+|ed\.?d\.?)\b/i], ['master', /\b(master(?:'s)? of [a-z ]+|master(?:'s)? in [a-z ]+|m\.?b\.?a\.?|m\.?s\.?\b|m\.?a\.?\b)/i], ['bachelor', /\b(bachelor(?:'s)? of [a-z ]+|bachelor(?:'s)? in [a-z ]+|b\.?s\.?\b|b\.?a\.?\b)/i], ['associate', /\b(associate(?:'s)? (?:of|in|degree)[a-z ]*|a\.?a\.?\b|a\.?s\.?\b)/i]];
-const CERT_RE = /\b(credential|license|licence|certification|certificate|certified|CPA|CBEST|CSET|BCBA|PMP|CFA)\b/i;
-function extractProposals(text) {
-  const lines = String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean), out = [], seen = new Set();
-  const push = (kind, data) => { const k = kind + JSON.stringify(data).toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push({ kind, data }); } };
-  lines.forEach((line, i) => {
-    if (line.length > 160) return;
-    for (const [level, re] of DEG) { const m = line.match(re); if (m && /\b(of|in|degree|b\.?[sa]\.?|m\.?[sab]\.?a?\.?|ph)/i.test(line)) {
-      const inM = line.match(/\bin\s+([A-Z][A-Za-z&' ]{2,40}?)(?=\s*(?:[,|(–—-]|$))/), ofM = line.match(/\b(?:Bachelor|Master|Associate|Doctor)(?:'s)?\s+of\s+(?!Science|Arts|Fine|Applied)([A-Z][A-Za-z&' ]{2,40}?)(?=\s*(?:[,|(–—-]|$))/i);
-      const fm = inM || ofM;
-      const seg = line.split(/[,|–—]/).map((x) => x.trim()).find((x) => /\b(university|college|institute|school)\b/i.test(x)) || ((/\b(university|college|institute|school)\b/i.test(lines[i + 1] || '') && lines[i + 1].length < 100) ? lines[i + 1] : '');
-      const school = seg;
-      push('education', { level, field: fm ? fm[1].trim().replace(/\s+/g, ' ') : '', school: school ? school.replace(/\s*[|–—-].*$/, '').trim() : '', status: /\b(expected|in progress|candidate|current)\b/i.test(line) ? 'in progress' : 'completed' }); break; } }
-    if (CERT_RE.test(line) && line.length < 110 && !/\b(responsib|manage|develop|prepare)/i.test(line)) push('cert', { name: line.replace(/^[•*\-–\s]+/, '').replace(/\s+(passed|earned|obtained|issued)?\s*(in\s*)?(19|20)\d{2}.*$/i, '').replace(/\s*[|–—-]\s*(\d{4}.*)?$/, ''), issuer: '', status: /\b(in progress|pursuing|candidate|expected)\b/i.test(line) ? 'in progress' : 'held' });
-    const exp = line.match(/^(.{3,70}?)\s*(?:,|\||–|—|-| at )\s*(.{2,70}?)\s*(?:,|\||–|—|-|\()\s*((?:19|20)\d{2})\s*(?:–|—|-|to)\s*((?:19|20)\d{2}|present|current)\)?$/i);
-    if (exp) { const y1 = Number(exp[3]), y2 = /present|current/i.test(exp[4]) ? new Date().getFullYear() : Number(exp[4]); if (y2 >= y1 && y2 - y1 <= 40) push('experience', { title: exp[1].trim(), employer: exp[2].trim(), field: '', years: y2 - y1, summary: '' }); }
-  });
-  const si = lines.findIndex((l) => /^(technical |core |key )?skills\b[:\s]*$/i.test(l) || /^skills\s*[:\-]/i.test(l));
-  if (si >= 0) {
-    const first = lines[si].replace(/^[^:\-]*[:\-]\s*/, '');
-    const block = [first, ...lines.slice(si + 1, si + 8).filter((l) => !/^(experience|education|certif|work|employment|projects|summary|references)\b/i.test(l))].join(',');
-    block.split(/[,;•|·\n]+/).map((s) => s.replace(/^[•*\-–\s]+/, '').trim()).filter((s) => s.length > 1 && s.length <= 40).slice(0, 30).forEach((s) => push('skill', { name: s }));
+/* ---- conflicts & duplicates against the current profile ---- */
+function tokens(s) { return norm(s).split(' ').filter((w) => w.length > 2); }
+function overlap(a, b) { const x = new Set(tokens(a)), y = tokens(b); return y.length ? y.filter((w) => x.has(w)).length / y.length : 0; }
+function compare(db, userId, kind, d) {
+  const recs = P.getProfile(db, userId)[{ education: 'education', experience: 'experience', cert: 'certs', skill: 'skills' }[kind]] || [];
+  for (const r of recs) {
+    const diffs = [];
+    if (kind === 'skill') { if (norm(r.name) === norm(d.name)) return { duplicate: true, record: r }; continue; }
+    if (kind === 'cert') { if (!(norm(r.name) === norm(d.name) || overlap(r.name, d.name) >= 0.8)) continue; if (r.status !== d.status) diffs.push(`status: profile says “${r.status}”, résumé says “${d.status}”`); }
+    else if (kind === 'education') {
+      const sameField = (norm(r.field) && norm(r.field) === norm(d.field)) || (r.title && d.title && norm(r.title) === norm(d.title));
+      if (!sameField) continue;
+      if (r.level && d.level && r.level !== d.level) diffs.push(`degree level: profile says ${r.level}, résumé says ${d.level}`);
+      if (r.school && d.school && norm(r.school) !== norm(d.school)) diffs.push(`school: profile says “${r.school}”, résumé says “${d.school}”`);
+      if (r.year && d.year && Number(r.year) !== Number(d.year)) diffs.push(`graduation year: profile says ${r.year}, résumé says ${d.year}`);
+    } else if (kind === 'experience') {
+      if (!(norm(r.employer) && norm(d.employer) && (norm(r.employer).includes(norm(d.employer)) || norm(d.employer).includes(norm(r.employer))))) continue;
+      if (overlap(r.title, d.title) < 0.5) diffs.push(`job title: profile says “${r.title}”, résumé says “${d.title}”`);
+      if (r.years && d.years && Math.abs(Number(r.years) - Number(d.years)) > 1) diffs.push(`years: profile says ${r.years}, résumé says ${d.years}`);
+      if (r.start && d.start && String(r.start).slice(0, 4) !== String(d.start).slice(0, 4)) diffs.push(`start date: profile says ${r.start}, résumé says ${d.start}`);
+    }
+    return diffs.length ? { duplicate: false, conflict: { recordId: r.id, verified: r.verified !== false, differences: diffs } } : { duplicate: true, record: r };
   }
-  return out.slice(0, 60);
+  return null;
+}
+
+/* ---- processing ---- */
+async function processResume(db, userId, id) {
+  const r = db.prepare('SELECT * FROM resumes WHERE id=? AND user_id=?').get(id, userId); if (!r) throw new HttpError(404, 'No résumé uploaded.');
+  db.prepare("UPDATE resumes SET status='processing', error=NULL WHERE id=?").run(id);
+  db.prepare("DELETE FROM resume_proposals WHERE resume_id=? AND status='pending'").run(id);
+  try {
+    const buf = fs.readFileSync(path.join(dirFor(userId), r.stored_name)), text = await extractText(path.extname(r.stored_name), buf);
+    if (norm(text).length < 40) throw Object.assign(new Error('No readable text was found. It may be a scanned image or a protected file. Upload a text-based PDF or Word file, or enter your information manually.'), { user: true });
+    const a = analyze(text); let dups = 0;
+    tx(db, () => {
+      const ins = db.prepare('INSERT INTO resume_proposals(user_id,resume_id,kind,data,origin,evidence,grp) VALUES(?,?,?,?,?,?,?)');
+      for (const p of a.proposals) { const c = compare(db, userId, p.kind, p.data); if (c && c.duplicate) { dups++; continue; } ins.run(userId, id, p.kind, JSON.stringify(p.data), p.origin, JSON.stringify(p.evidence), p.group); }
+      db.prepare("UPDATE resumes SET status='ready', text=?, insights=?, analyzed_at=?, duplicate_count=?, accepted_count=0, rejected_count=0 WHERE id=?").run(text.slice(0, 200000), JSON.stringify(a.insights), now(), dups, id);
+    });
+  } catch (e) {
+    if (process.env.DEBUG_RESUME) console.error('résumé analysis error:', e.stack);
+    const msg = e.user ? e.message : (e.message === 'timeout' ? 'Reading the file took too long.' : 'The document could not be read — it may be corrupt or password-protected. Upload another file, or enter your information manually.');
+    db.prepare("UPDATE resumes SET status='failed', error=?, analyzed_at=? WHERE id=?").run(msg, now(), id);
+  }
 }
 
 async function saveResume(db, userId, filename, buf) {
   const ext = path.extname(String(filename || '')).toLowerCase();
-  if (!TYPES[ext]) throw new HttpError(415, 'Upload a .pdf, .docx, .txt or .md file.');
-  if (!buf.length) throw new HttpError(400, 'The file is empty.');
-  if (buf.length > config.maxResumeBytes) throw new HttpError(413, `Résumés must be under ${Math.round(config.maxResumeBytes / 1048576)} MB.`);
-  if (!sniff(ext, buf)) throw new HttpError(415, 'That file doesn’t look like a valid ' + ext + ' document.');
-  removeResume(db, userId);
-  const text = (await extractText(ext, buf)).slice(0, 200000);
+  await validate(ext, buf); // throws before anything is stored
   const dir = dirFor(userId); fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const stored = crypto.randomBytes(16).toString('hex') + ext;
   fs.writeFileSync(path.join(dir, stored), buf, { mode: 0o600 });
+  const old = db.prepare('SELECT id, stored_name FROM resumes WHERE user_id=?').all(userId);
   const safeName = path.basename(String(filename)).replace(/[^\w.\- ()]+/g, '_').slice(0, 120);
-  const id = Number(db.prepare('INSERT INTO resumes(user_id,filename,stored_name,mime,size,text,created_at) VALUES(?,?,?,?,?,?,?)').run(userId, safeName, stored, TYPES[ext], buf.length, text, now()).lastInsertRowid);
-  const proposals = extractProposals(text);
-  const ins = db.prepare('INSERT INTO resume_proposals(user_id,resume_id,kind,data) VALUES(?,?,?,?)');
-  tx(db, () => proposals.forEach((p) => ins.run(userId, id, p.kind, JSON.stringify(p.data))));
-  return { id, filename: safeName, size: buf.length, textExtracted: text.length > 0, proposals: listProposals(db, userId) };
+  const id = Number(db.prepare("INSERT INTO resumes(user_id,filename,stored_name,mime,size,text,created_at,status) VALUES(?,?,?,?,?,?,?,'processing')").run(userId, safeName, stored, TYPES[ext], buf.length, '', now()).lastInsertRowid);
+  for (const o of old) { try { fs.unlinkSync(path.join(dir, o.stored_name)); } catch (_) { /* already gone */ } db.prepare('DELETE FROM resumes WHERE id=?').run(o.id); } // replace: the previous file is deleted
+  await processResume(db, userId, id);
+  return state(db, userId);
 }
-function listProposals(db, userId) { return db.prepare("SELECT id, kind, data FROM resume_proposals WHERE user_id=? AND status='pending' ORDER BY id").all(userId).map((r) => ({ id: r.id, kind: r.kind, data: j(r.data, {}) })); }
+async function retry(db, userId) { const r = db.prepare('SELECT id FROM resumes WHERE user_id=? ORDER BY id DESC LIMIT 1').get(userId); if (!r) throw new HttpError(404, 'No résumé uploaded.'); await processResume(db, userId, r.id); return state(db, userId); }
+
+function state(db, userId) {
+  const r = db.prepare('SELECT * FROM resumes WHERE user_id=? ORDER BY id DESC LIMIT 1').get(userId);
+  if (!r) return { resume: null, proposals: [] };
+  const rows = db.prepare("SELECT * FROM resume_proposals WHERE resume_id=? AND user_id=? AND status='pending' ORDER BY id").all(r.id, userId);
+  const proposals = rows.map((p) => { const data = j(p.data, {}), c = compare(db, userId, p.kind, data); return { id: p.id, kind: p.kind, group: p.grp || p.kind, origin: p.origin, evidence: j(p.evidence, []), data, conflict: c && c.conflict ? c.conflict : null }; });
+  return { resume: { id: r.id, filename: r.filename, size: r.size, uploadedAt: r.created_at, status: r.status, error: r.error, analyzedAt: r.analyzed_at, textAvailable: !!r.text, insights: j(r.insights, null), counts: { pending: proposals.length, accepted: r.accepted_count, rejected: r.rejected_count, duplicates: r.duplicate_count } }, proposals };
+}
 function removeResume(db, userId) {
-  for (const r of db.prepare('SELECT * FROM resumes WHERE user_id=?').all(userId)) { try { fs.unlinkSync(path.join(dirFor(userId), r.stored_name)); } catch (_) { /* already gone */ } }
+  const rows = db.prepare('SELECT * FROM resumes WHERE user_id=?').all(userId); let deleted = 0;
+  for (const r of rows) { const f = path.join(dirFor(userId), r.stored_name); try { fs.unlinkSync(f); } catch (_) { /* already gone */ } if (!fs.existsSync(f)) deleted++; }
   db.prepare('DELETE FROM resumes WHERE user_id=?').run(userId); // proposals cascade
+  return { removed: rows.length, fileDeleted: deleted === rows.length };
 }
 function resumeFile(db, userId) {
   const r = db.prepare('SELECT * FROM resumes WHERE user_id=? ORDER BY id DESC LIMIT 1').get(userId);
@@ -83,12 +121,33 @@ function resumeFile(db, userId) {
   if (!path.resolve(file).startsWith(path.resolve(dirFor(userId)) + path.sep) || !fs.existsSync(file)) throw new HttpError(404, 'File not found.');
   return { file, filename: r.filename, mime: r.mime };
 }
-function decideProposal(db, userId, id, accept, edited) {
+
+/* Accept (optionally edited) / reject one proposal. Conflicts with existing records require an explicit choice. */
+function decideProposal(db, userId, id, accept, body) {
+  body = body || {};
   const p = db.prepare("SELECT * FROM resume_proposals WHERE id=? AND user_id=? AND status='pending'").get(id, userId);
   if (!p) throw new HttpError(404, 'Suggestion not found.');
-  let out = null;
-  if (accept) out = addRecord(db, userId, p.kind, edited && typeof edited === 'object' ? edited : j(p.data, {}), 'resume');
-  db.prepare('UPDATE resume_proposals SET status=? WHERE id=?').run(accept ? 'accepted' : 'rejected', id);
-  return out;
+  const bump = (col) => db.prepare(`UPDATE resumes SET ${col}=${col}+1 WHERE id=?`).run(p.resume_id);
+  if (!accept) { db.prepare("UPDATE resume_proposals SET status='rejected' WHERE id=?").run(id); bump('rejected_count'); return null; }
+  const data = Object.assign({}, j(p.data, {}), body.data && typeof body.data === 'object' ? body.data : {}), edited = !!(body.data && Object.keys(body.data).length);
+  if (p.kind === 'skill' && p.origin === 'inferred') data.origin = 'inferred';
+  const c = compare(db, userId, p.kind, data);
+  if (c && c.duplicate) { db.prepare("UPDATE resume_proposals SET status='rejected' WHERE id=?").run(id); bump('duplicate_count'); return null; }
+  if (c && c.conflict && !['keep_existing', 'add_separate', 'replace'].includes(body.mode)) throw new HttpError(409, 'This conflicts with something already in your profile. Choose what to do.', { conflict: c.conflict });
+  if (c && c.conflict && body.mode === 'keep_existing') { db.prepare("UPDATE resume_proposals SET status='rejected' WHERE id=?").run(id); bump('rejected_count'); return null; }
+  // Quick-accepting an ambiguous education line or a credential records it as reported-but-unconfirmed; only an explicit confirmation verifies it.
+  const needsConfirm = (p.kind === 'education' || p.kind === 'cert') && !edited && (data.flag || p.kind === 'cert');
+  if (data.verified === undefined) data.verified = !needsConfirm;
+  let res;
+  if (c && c.conflict && body.mode === 'replace') res = P.updateRecord(db, userId, p.kind, c.conflict.recordId, Object.assign(data, { verified: body.data && body.data.verified === true }));
+  else res = P.addRecord(db, userId, p.kind, data, 'resume');
+  db.prepare("UPDATE resume_proposals SET status='accepted' WHERE id=?").run(id); bump('accepted_count');
+  return res;
 }
-module.exports = { saveResume, listProposals, removeResume, resumeFile, decideProposal, extractProposals };
+function finish(db, userId) {
+  const s = state(db, userId); if (!s.resume) throw new HttpError(404, 'No résumé uploaded.');
+  const c = s.resume.counts, any = c.accepted > 0;
+  return { accepted: c.accepted, rejected: c.rejected, pending: c.pending, duplicates: c.duplicates, searchExpanded: any,
+    message: any ? `Added ${c.accepted} item${c.accepted === 1 ? '' : 's'} to your profile. Your job searches are being expanded with the new information.` : (c.duplicates && !c.pending ? 'Everything in your résumé was already in your profile, so no major change was detected and your searches were not expanded.' : 'No new information was added, so your searches were not expanded.') };
+}
+module.exports = { saveResume, retry, state, removeResume, resumeFile, decideProposal, finish, compare };

@@ -1,0 +1,30 @@
+{
+  "_comment": "Information supplied by the family. Education is stored UNVERIFIED with the flags below until the user reviews it. No school names, dates, exact degree titles, licenses or certifications are recorded because none were provided.",
+  "education": [
+    {
+      "level": "", "field": "Finance", "title": "", "school": "", "status": "unknown", "year": null,
+      "flag": "Provided as “Finance major”. It is unclear whether this is a separate degree or the major of one of the degrees below, and the degree level is unknown."
+    },
+    {
+      "level": "bachelor", "field": "Business Management and Administration", "title": "", "school": "", "status": "completed", "year": null,
+      "flag": "Provided as “Bachelor’s degree in Business Management and Administration”. Exact degree title (e.g. B.S. or B.A.), school and graduation date were not provided."
+    },
+    {
+      "level": "", "field": "Business Finance", "title": "", "school": "", "status": "unknown", "year": null,
+      "flag": "Provided as “Business Finance major”. It is unclear whether this is the major of the bachelor’s degree above or a separate degree, and the degree level is unknown."
+    },
+    {
+      "level": "master", "field": "Special Education", "title": "", "school": "", "status": "completed", "year": null,
+      "flag": "Provided as “Master’s degree in Special Education”. Exact degree title, school and date were not provided. A master’s degree is not a teaching credential or license; none has been recorded."
+    }
+  ],
+  "preferences": {
+    "categories": ["Finance", "Business", "Education", "Special Education"],
+    "cities": ["North Stockton, CA", "Stockton, CA", "Lodi, CA", "Tracy, CA", "Manteca, CA"],
+    "commuteMiles": 30,
+    "statewide": true,
+    "workModes": ["onsite"],
+    "types": ["Full-time"],
+    "salary": { "min": 27, "period": "hour" }
+  }
+}

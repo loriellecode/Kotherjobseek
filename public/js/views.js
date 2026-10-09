@@ -29,8 +29,8 @@
   function indicators(m) {
     const q = m.qualification, qLabel = { strong: 'Strong', potential: 'Needs verifying', needs_more: 'Gaps found' }[q.level];
     const sLabel = { meets_desired: 'Meets desired', meets_min: 'Meets minimum', below: 'Below minimum', unlisted: 'Not listed', estimated: 'Estimated', no_preference: 'Not set' }[m.salary.status];
-    const lLabel = { priority: 'Priority area', preferred_city: 'Preferred city', within_commute: 'Within commute', remote: 'Remote', remote_not_preferred: 'Remote', outside: 'Too far', not_preferred: 'Not preferred', unknown: 'Unknown' }[m.location.status];
-    return `<div class="inds">${indicator('Qualifications', qLabel, `${q.checks.filter((c) => c.status === 'met').length} met · ${q.mandatoryUnknown} required unknown · ${q.mandatoryUnmet} required unmet`, q.score, q.level)}
+    const lLabel = { priority: 'Priority area', preferred_city: 'Preferred city', within_commute: 'Within commute', remote: 'Remote', remote_not_preferred: 'Remote', elsewhere_ca: 'Elsewhere in California', outside: 'Too far', not_preferred: 'Not preferred', unknown: 'Unknown' }[m.location.status];
+    return `<div class="inds">${indicator('Qualifications', qLabel, `${q.checks.filter((c) => c.status === 'met').length} confirmed · ${q.mandatoryUnverified || 0} to confirm · ${q.mandatoryUnknown} unknown · ${q.mandatoryUnmet} unmet (required)`, q.score, q.level)}
       ${indicator('Salary', sLabel, m.salary.text, m.salary.score)}${indicator('Location', lLabel, m.location.text, m.location.score)}${indicator('Overall relevance', `${m.overall}/100`, 'Estimate of profile fit', m.overall, 'overall')}</div>`;
   }
 
@@ -72,6 +72,7 @@
 
   /* ---------- status + banners ---------- */
   A.statusHTML = function () {
+    if (S().busy) return `<div class="statusbar run" role="status"><span class="spin" aria-hidden="true"></span><div class="grow"><b>${esc(S().busy)}…</b></div></div>`;
     const st = S().status; if (!st || st.state === 'idle' || (st.dismissed)) return '';
     const run = ['queued', 'searching', 'matching', 'updating'].includes(st.state);
     if (run) return `<div class="statusbar run" role="status"><span class="spin" aria-hidden="true"></span><div class="grow"><b>${esc(st.label)}…</b>${st.state === 'queued' ? ' <span class="note">Edits made within a few seconds are combined into one search.</span>' : ''}</div></div>`;
@@ -109,6 +110,42 @@
       <div id="statusbar">${A.statusHTML()}</div>${inner}</main></div>`;
   }
 
+
+  /* ---------- résumé panel (My Profile) ---------- */
+  function resumePanel() {
+    const R = S().resume && S().resume.resume, busy = S().busy && /résumé/i.test(S().busy);
+    const priv = `<p class="note priv">${icon('lock')} Private to your account and stored on this server. It is read here to suggest profile entries — never sent to an outside AI service or to employers.</p>`;
+    if (busy) return `<section class="panel resume-panel"><h2>Résumé</h2><div class="statusbar run"><span class="spin"></span><div class="grow"><b>${esc(S().busy)}…</b></div></div></section>`;
+    if (!R) return `<section class="panel resume-panel"><h2>Résumé</h2><p class="note" style="margin-top:0">Upload a PDF or Word résumé. Kother suggests education, work history, skills and credentials for you to review, then uses what you approve to widen your job search.</p><div class="actions"><button class="btn primary" data-action="resume-upload">${icon('upload')} Upload résumé</button><button class="btn quiet" data-action="edit" data-sec="experience">Enter work history manually</button></div><p class="note">PDF or DOCX, up to 5 MB.</p>${priv}</section>`;
+    const st = { ready: ['Analysis complete', 'ok'], failed: ['Analysis failed', 'bad'], processing: ['Processing…', 'run'] }[R.status] || ['', ''], c = R.counts;
+    return `<section class="panel resume-panel"><div class="row1"><h2 style="margin:0;flex:1">Résumé</h2><span class="chip-s s-${st[1]}">${st[0]}</span></div>
+      <dl class="kv" style="margin-top:12px"><div><dt>File</dt><dd>${esc(R.filename)}</dd></div><div><dt>Uploaded</dt><dd>${esc(A.fmtDate(new Date(R.uploadedAt).toISOString()))} · ${(R.size / 1024).toFixed(0)} KB</dd></div><div><dt>Status</dt><dd>${R.status === 'ready' ? (c.pending ? A.plural(c.pending, 'suggestion') + ' to review' : 'Review complete') : R.status === 'failed' ? 'Could not be analyzed' : 'Working'}</dd></div><div><dt>Added from this résumé</dt><dd>${c.accepted} accepted · ${c.rejected} rejected</dd></div></dl>
+      ${R.status === 'failed' ? `<div class="banner warn" role="alert">${icon('alert')}<div class="grow"><b>We couldn’t read this résumé.</b> ${esc(R.error || '')}<div class="acts"><button class="btn sm primary" data-action="resume-retry">Retry analysis</button><button class="btn sm" data-action="resume-upload">Upload another file</button><button class="btn sm quiet" data-action="edit" data-sec="experience">Enter work history manually</button></div></div></div>` : ''}
+      ${R.status === 'ready' && c.duplicates && !c.pending ? `<p class="note">${c.duplicates} item${c.duplicates === 1 ? ' was' : 's were'} already in your profile, so nothing major changed.</p>` : ''}
+      <div class="actions">${R.status === 'ready' && c.pending ? `<button class="btn primary" data-action="resume-review">Review ${c.pending} suggestion${c.pending === 1 ? '' : 's'}</button>` : ''}<button class="btn" data-action="resume-upload">Replace résumé</button>${R.status !== 'processing' ? '<button class="btn" data-action="resume-retry">Re-run analysis</button>' : ''}<a class="btn quiet" href="/api/resume/file" download>Download</a><button class="btn quiet danger" data-action="resume-remove">${icon('trash')} Remove</button></div>${priv}</section>`;
+  }
+
+  /* ---------- "Other Careers to Explore" ---------- */
+  function careerCard(c) {
+    const inc = c.state === 'include', st = c.stats;
+    const pay = st && st.salary ? `${KJ.fmtMoney(st.salary.low)}–${KJ.fmtMoney(st.salary.high)}/yr across ${st.salary.n} current listings` : 'Not enough current listings with posted pay to say';
+    const geo = st ? (st.openings ? `${A.plural(st.openings, 'current opening')}${st.nearby ? `, ${st.nearby} in your preferred area` : ', none in your preferred area yet'}${st.cities.length ? ' · ' + st.cities.slice(0, 3).map((x) => x.city).join(', ') : ''}` : 'No current openings found yet') : '';
+    const list = (arr) => `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+    return `<article class="card career" data-career="${esc(c.id)}"><div class="employer">${esc(c.category)}${c.strength ? ' · ' + esc(c.strength) + ' evidence' : ''}</div><h3>${esc(c.title)}</h3><p class="blurb" style="-webkit-line-clamp:3">${esc(c.does)}</p>
+      <h4>Why your background may be relevant</h4>${list(c.evidence.slice(0, 3).map((e) => e.text))}
+      ${c.transferable.length ? `<h4>Transferable skills</h4><p class="meta">${esc(c.transferable.slice(0, 4).join(' · '))}</p>` : ''}
+      <dl class="mini-kv"><div><dt>Pay in current listings</dt><dd>${esc(pay)}</dd></div>${geo ? `<div><dt>Availability</dt><dd>${esc(geo)}</dd></div>` : ''}</dl>
+      <details><summary>Qualifications and gaps</summary><h4>Typically required</h4>${list(c.essential)}${c.known.length ? `<h4>Known to be satisfied</h4>${list(c.known)}` : ''}${c.toConfirm.length ? `<h4>Reported — needs your confirmation</h4>${list(c.toConfirm)}` : ''}${c.unknown.length ? `<h4>Unknown</h4>${list(c.unknown)}` : ''}${c.unmet.length ? `<h4>Appears unmet</h4>${list(c.unmet)}` : ''}${c.licensingNote ? `<p class="note warnline">${icon('alert')} ${esc(c.licensingNote)}</p>` : ''}<p class="note">Requirements are typical and vary by employer.</p></details>
+      <div class="foot"><button class="btn sm ${inc ? 'on' : ''}" data-action="career-state" data-id="${esc(c.id)}" data-state="${inc ? 'clear' : 'include'}" aria-pressed="${inc}">${inc ? 'Included in searches ✓' : 'Include in searches'}</button><button class="btn sm quiet" data-action="career-state" data-id="${esc(c.id)}" data-state="exclude">Exclude</button>${st && st.openings ? `<button class="btn sm quiet" data-action="career-view" data-q="${esc(c.searchTerms[0])}">View openings</button>` : ''}</div></article>`;
+  }
+  function careerSection() {
+    const C = S().careers; if (!C) return '';
+    const shown = C.suggestions.filter((c) => c.otherCategory || c.state === 'include').slice(0, 10);
+    const hidden = C.excluded.length ? `<p class="note">${A.plural(C.excluded.length, 'career')} hidden: ${C.excluded.map((x) => `${esc(x.title)} <button class="btn quiet sm" data-action="career-state" data-id="${esc(x.id)}" data-state="clear">Restore</button>`).join(' · ')}</p>` : '';
+    if (!shown.length) return `<section class="section"><div class="sec-head"><div class="grow"><h2>Other Careers to Explore</h2><p>Careers are suggested only when your education, work history or skills support them.</p></div></div><div class="banner">${icon('info')}<div class="grow"><b>No supported suggestions yet.</b> Add work history or upload a résumé so suggestions can be backed by your actual experience.<div class="acts"><a class="btn sm" href="#/profile">Open profile</a></div></div></div>${hidden}</section>`;
+    return `<section class="section" aria-labelledby="h-careers"><div class="sec-head"><div class="grow"><h2 id="h-careers">Other Careers to Explore</h2><p>Each suggestion shows the evidence from your profile behind it. Nothing here claims you qualify — check the gaps.</p></div><div class="rail-nav"><button data-action="rail" data-dir="-1" data-target="rail-careers" aria-label="Scroll careers back">${icon('left')}</button><button data-action="rail" data-dir="1" data-target="rail-careers" aria-label="Scroll careers forward">${icon('right')}</button></div></div><div class="rail careers-rail" id="rail-careers" data-rail="careers">${shown.map(careerCard).join('')}</div>${hidden}</section>`;
+  }
+
   /* ---------- discover ---------- */
   function providerChecklist() {
     const live = S().providers.filter((p) => p.kind !== 'import');
@@ -143,7 +180,7 @@
         const feed = KJ.buildFeed(S().jobs, p, { newIds: ses().newIds });
         if (!feed.featured) inner += emptyFeed('feed');
         else {
-          inner += featuredCard(feed.featured, 'Featured opportunity') + feed.sections.map(section).join('');
+          inner += featuredCard(feed.featured, 'Featured opportunity') + feed.sections.map(section).join('') + careerSection();
           if (!feed.sections.some((s) => s.id === 'top')) inner += `<div class="banner" style="margin-top:28px">${icon('info')}<div class="grow"><b>Top Matches appear as you confirm qualifications.</b> Add education, experience and credentials so strong matches can be told apart from ones that need checking.<div class="acts"><a class="btn sm" href="#/profile">Complete profile</a></div></div></div>`;
         }
       } else {
@@ -178,8 +215,8 @@
   const list = (arr, empty) => (arr && arr.length ? `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : `<p class="note" style="margin:0">${empty || 'Not listed in the posting'}</p>`);
   function checkList(m, mandatory) {
     const cs = m.qualification.checks.filter((c) => c.mandatory === mandatory); if (!cs.length) return `<p class="note" style="margin:0">None found in the listing data.</p>`;
-    const ic = { met: ['met', 'check'], unknown: ['unk', 'dash'], unmet: ['gap', 'alert'] };
-    return `<ul class="status-list">${cs.map((c) => `<li class="${ic[c.status][0]}">${icon(ic[c.status][1])}<span><b>${esc(c.requirement)}</b> — ${esc(c.status === 'met' ? 'met' : c.status === 'unknown' ? 'unknown' : 'not met')}: ${esc(c.note)}${c.inferred ? ' <em class="note">(detected from the description text — confirm in the original posting)</em>' : ''}</span></li>`).join('')}</ul>`;
+    const ic = { met: ['met', 'check'], reported: ['unk', 'info'], unknown: ['unk', 'dash'], unmet: ['gap', 'alert'] };
+    return `<ul class="status-list">${cs.map((c) => `<li class="${ic[c.status][0]}">${icon(ic[c.status][1])}<span><b>${esc(c.requirement)}</b> — ${esc({ met: 'met', reported: 'reported, needs confirming', unknown: 'unknown', unmet: 'not met' }[c.status])}: ${esc(c.note)}${c.inferred ? ' <em class="note">(detected from the description text — confirm in the original posting)</em>' : ''}</span></li>`).join('')}</ul>`;
   }
   function trackerPanel(j) {
     const a = S().apps[j.id]; if (!a) return '';
@@ -212,6 +249,7 @@
           <details class="how"><summary>How is this calculated?</summary><p class="note">${esc(m.explanation)}</p><table class="parts"><tbody>${m.parts.map((p) => `<tr><td>${esc(p.label)}</td><td>${p.weight}%</td><td>${p.score}/100</td></tr>`).join('')}</tbody></table>${m.capped ? '<p class="note">Capped at 60 because a required qualification appears unmet.</p>' : ''}</details></section>
         <section class="panel"><h2>Your qualifications</h2><h3>Required</h3>${checkList(m, true)}<h3>Preferred</h3>${checkList(m, false)}
           <h3>Qualifications you appear to meet</h3>${m.meets.length ? list(m.meets) : '<p class="note" style="margin:0">None confirmed yet.</p>'}
+          <h3>Reported by you, needs confirming</h3>${m.unverified && m.unverified.length ? list(m.unverified) : '<p class="note" style="margin:0">Nothing waiting on confirmation.</p>'}
           <h3>Still unknown</h3>${m.unknown.length ? list(m.unknown) : '<p class="note" style="margin:0">Nothing left to verify.</p>'}
           <h3>Potential gaps</h3>${m.gaps.length ? list(m.gaps) : '<p class="note" style="margin:0">No unmet requirements found in the listing data.</p>'}
           <p class="note"><a href="#/profile">Update your profile</a> and this is re-evaluated automatically.</p></section>
@@ -231,7 +269,7 @@
   /* ---------- profile ---------- */
   const EDU = KJ.EDU_LABEL;
   A.SECTIONS = {
-    education: { t: 'Education', sum: (p) => (p.education.length ? p.education.map((e) => `${EDU[e.level]}${e.field ? ', ' + e.field : ''}${e.status === 'in progress' ? ' (in progress)' : ''}${e.source === 'resume' ? ' · from résumé' : ''}`).join(' · ') : 'No education added. Add degrees so education requirements can be checked.') },
+    education: { t: 'Education', sum: (p) => (p.education.length ? p.education.map((e) => `${e.level ? EDU[e.level] : 'Degree level not specified'}${e.field ? ', ' + e.field : ''}${e.status === 'in progress' ? ' (in progress)' : ''}${e.verified === false ? ' — unverified' : ''}`).join(' · ') : 'No education added. Add degrees so education requirements can be checked.') },
     experience: { t: 'Work Experience', sum: (p) => (p.experience.length ? p.experience.map((e) => `${e.title}${e.years ? ' · ' + e.years + ' yr' : ''}`).join(' · ') : 'No work history added. Roles that ask for experience stay “needs verification”.') },
     skills: { t: 'Skills', sum: (p) => (p.skills.length ? p.skills.map((s) => s.name).join(', ') : 'No skills added.') },
     certs: { t: 'Certifications and Licenses', sum: (p) => (p.certs.length ? p.certs.map((c) => c.name + (c.status === 'in progress' ? ' (in progress)' : '')).join(' · ') : p.certsNone ? 'You said you hold none.' : 'Not answered. Jobs that require credentials stay “needs verification”.') },
@@ -239,7 +277,7 @@
     prefs: { t: 'Job Preferences', sum: (p) => `${p.titles.length ? 'Titles: ' + p.titles.join(', ') + ' · ' : ''}${p.categories.join(', ') || 'No categories'} · ${p.types.join(', ') || 'Any type'} · ${p.workModes.map((m) => ({ onsite: 'On-site', hybrid: 'Hybrid', remote: 'Remote' }[m])).join(', ')}` },
     location: { t: 'Location', sum: (p) => `${p.cities.join(' › ') || 'No cities'} · within ${p.commuteMiles} miles` },
     salary: { t: 'Salary', sum: (p) => { const f = KJ.profileFloor(p), d = KJ.profileDesired(p); return f === null ? 'No minimum set. Set one so lower-paying jobs stay out of your feed.' : `Minimum ${KJ.fmtMoney(f)}/yr${d ? ' · Desired ' + KJ.fmtMoney(d) + '/yr' : ''}${p.salary.showBelow ? ' · also showing jobs below minimum' : ''}`; } },
-    notify: { t: 'Notification Preferences', sum: (p) => { const n = p.notify; return n.enabled ? [n.inApp && 'In app', n.email && 'Email', n.push && 'Push'].filter(Boolean).join(', ') + ' · ' + [n.immediate && 'Immediate', n.daily && 'Daily', n.weekly && 'Weekly'].filter(Boolean).join(', ') + ` · Quiet ${n.quietStart}:00–${n.quietEnd}:00` : 'Notifications off (searching continues)'; } },
+    notify: { t: 'Notification Preferences', sum: (p) => { const n = p.notify; return n.enabled ? [n.inApp && 'In app', n.push && 'Push'].filter(Boolean).join(', ') + ' · ' + [n.immediate && 'Immediate', n.daily && 'Daily', n.weekly && 'Weekly'].filter(Boolean).join(', ') + ` · Quiet ${n.quietStart}:00–${n.quietEnd}:00` : 'Notifications off (searching continues)'; } },
   };
   function vProfile() {
     const p = profile(), comp = KJ.completion(p), done = comp.filter((c) => c.done).length, pct = Math.round((done / comp.length) * 100), first = comp.find((c) => !c.done) || comp[0];
@@ -247,9 +285,11 @@
     const inner = imageSlot('professional development', 'banner') + `<section class="panel summary" style="margin-top:12px"><div class="sum-head"><div class="ring" style="--p:${pct}" role="img" aria-label="${pct}% complete"><span>${pct}%</span></div>
       <div class="grow"><h2>${p.name ? esc(p.name) : 'Your profile'}</h2><div class="note" style="margin:2px 0 0">${done} of ${comp.length} sections complete · revision ${p.revision} · <button class="btn quiet sm" data-action="edit" data-sec="basics" style="min-height:32px">${p.name ? 'Edit name' : 'Add your name'}</button></div></div>
       <button class="btn primary" data-action="edit" data-sec="${first.id}">${icon('pencil')} Edit Profile</button></div>
-      <div><h3 class="used-h">Currently used for matching</h3><div class="used"><div><b>Preferred titles</b>${esc(p.titles.join(', ') || '—')}</div><div><b>Categories</b>${esc(p.categories.join(', ') || '—')}</div><div><b>Education</b>${p.education.length ? esc(p.education.map((e) => EDU[e.level]).join(', ')) : 'Not added'}</div><div><b>Experience</b>${p.experience.length ? `${exYears} yr across ${A.plural(p.experience.length, 'role')}` : 'Not added'}</div><div><b>Credentials</b>${p.certs.length ? esc(p.certs.map((c) => c.name).join(', ')) : p.certsNone ? 'None held' : 'Not answered'}</div><div><b>Locations</b>${esc(p.cities.join(', ') || '—')} (${p.commuteMiles} mi)</div><div><b>Salary</b>${f ? 'Min ' + KJ.fmtMoney(f) + '/yr' : 'No minimum set'}</div><div><b>Work style</b>${esc(p.workModes.join(', '))}</div></div></div>
+      <div><h3 class="used-h">Currently used for matching</h3><div class="used"><div><b>Preferred titles</b>${esc(p.titles.join(', ') || '—')}</div><div><b>Categories</b>${esc(p.categories.join(', ') || '—')}</div><div><b>Education</b>${p.education.length ? esc(p.education.map((e) => (e.level ? EDU[e.level] : 'Level unspecified') + (e.field ? ' — ' + e.field : '') + (e.verified === false ? ' (unverified)' : '')).join('; ')) : 'Not added'}</div><div><b>Experience</b>${p.experience.length ? `${exYears} yr across ${A.plural(p.experience.length, 'role')}` : 'Not added'}</div><div><b>Credentials</b>${p.certs.length ? esc(p.certs.map((c) => c.name).join(', ')) : p.certsNone ? 'None held' : 'Not answered'}</div><div><b>Locations</b>${esc(p.cities.join(', ') || '—')} (${p.commuteMiles} mi)</div><div><b>Salary</b>${f ? 'Min ' + KJ.fmtMoney(f) + '/yr' : 'No minimum set'}</div><div><b>Work style</b>${esc(p.workModes.join(', '))}</div></div></div>
+      ${p.education.some((e) => e.verified === false) ? `<div class="banner warn" style="margin-bottom:0">${icon('alert')}<div class="grow"><b>${A.plural(p.education.filter((e) => e.verified === false).length, 'education entry', 'education entries')} need your review.</b> They came from information provided to us and are treated as <i>reported, not confirmed</i> until you confirm or correct them. Nothing here is assumed to be a teaching credential or license.<div class="acts"><button class="btn sm primary" data-action="edit" data-sec="education">Review education</button></div></div></div>` : ''}
       <p class="note priv">${icon('lock')} Only job titles, categories and city names are sent to job sources — never your name, email, résumé or employers.</p></section>
-      <div class="sections">${comp.map((c) => { const m = A.SECTIONS[c.id]; return `<section class="sec-card"><div class="row1"><h3>${m.t}</h3>${c.done ? `<span class="status">${icon('check')}Complete</span>` : `<span class="status todo">${icon('dash')}Needs info</span>`}</div><p>${esc(m.sum(p))}</p><div class="actions"><button class="btn sm" data-action="edit" data-sec="${c.id}" aria-label="Edit ${m.t}">${c.done ? 'Edit' : 'Add info'}</button></div></section>`; }).join('')}</div>
+      ${resumePanel()}
+      <div class="sections">${comp.filter((c) => c.id !== 'resume').map((c) => { const m = A.SECTIONS[c.id]; return `<section class="sec-card"><div class="row1"><h3>${m.t}</h3>${c.done ? `<span class="status">${icon('check')}Complete</span>` : `<span class="status todo">${icon('dash')}Needs info</span>`}</div><p>${esc(m.sum(p))}</p><div class="actions"><button class="btn sm" data-action="edit" data-sec="${c.id}" aria-label="Edit ${m.t}">${c.done ? 'Edit' : 'Add info'}</button></div></section>`; }).join('')}</div>
       <section class="panel" style="margin-top:18px"><h2>Your data</h2><p class="note" style="margin-top:0">Your profile and résumé are visible only to you. You can remove them at any time.</p><div class="actions"><button class="btn danger" data-action="delete-profile">Delete my profile data</button><button class="btn danger" data-action="delete-account">Delete my account</button></div></section>`;
     return shell('profile', 'My Profile', 'Used to personalize your feed', inner);
   }
@@ -261,7 +301,7 @@
       ${p.kind === 'import' ? `<p class="note">${A.plural(p.jobCount, 'listing')} imported from files you provided.</p>` : p.configured ? `<p class="note">${A.plural(p.jobCount, 'listing')} stored · ${p.callsToday}/${p.budget} requests used in the last 24 h${p.lastSuccess ? ' · last successful search ' + esc(A.ago(p.lastSuccess)) : ' · no successful search yet'}</p>${p.lastError ? `<p class="note bad">Last error: ${esc(p.lastError)}</p>` : ''}` : `<p class="note">Missing: <code>${esc((p.missing || []).join(', '))}</code></p><details><summary>Setup steps</summary><ol>${p.setup.map((s) => `<li>${esc(s)}</li>`).join('')}</ol></details><p class="note"><a href="${esc(p.docs)}" target="_blank" rel="noopener noreferrer">Official documentation ${icon('ext')}</a></p>`}</div>`).join('');
     const inner = `<section class="panel" style="margin-top:12px"><h2>Job sources</h2><p class="note" style="margin-top:0">Kother searches only the sources below, through their permitted APIs or feeds. No single source covers every job on the web.</p>${rows}
       <div class="actions"><button class="btn primary" data-action="search-now">${icon('refresh')} Search now</button><button class="btn" data-action="import-open">Import listings (JSON)</button><button class="btn quiet" data-action="download-template">Download template</button></div></section>
-      <section class="panel" style="margin-top:14px"><h2>Notifications and photos</h2><dl class="kv"><div><dt>Email</dt><dd>${cfg.email ? 'Configured' : 'Not configured on this server'}</dd></div><div><dt>Web push</dt><dd>${cfg.pushPublicKey ? (Notification && Notification.permission === 'granted' ? 'Allowed in this browser' : 'Available — enable below') : 'Not configured on this server'}</dd></div><div><dt>Editorial photos (Pexels)</dt><dd>${cfg.imagery && cfg.imagery.configured ? 'Configured' : 'Not configured'}</dd></div></dl>
+      <section class="panel" style="margin-top:14px"><h2>Notifications and photos</h2><dl class="kv"><div><dt>Web push</dt><dd>${cfg.pushPublicKey ? (Notification && Notification.permission === 'granted' ? 'Allowed in this browser' : 'Available — enable below') : 'Not configured on this server'}</dd></div><div><dt>Editorial photos (Pexels)</dt><dd>${cfg.imagery && cfg.imagery.configured ? 'Configured' : 'Not configured'}</dd></div></dl>
         <div class="actions">${cfg.pushPublicKey ? '<button class="btn" data-action="enable-push">Enable push on this device</button><button class="btn quiet" data-action="disable-push">Turn off on this device</button>' : ''}<a class="btn quiet" href="#/profile">Notification preferences</a></div>
         <p class="note">Push is only confirmed to work once it has been tested on your own device in the deployed app.</p></section>
       <section class="panel" style="margin-top:14px"><h2>Appearance and account</h2><div class="field" style="max-width:280px"><label for="theme">Theme</label><select id="theme" data-action="theme"><option value="auto" ${th === 'auto' ? 'selected' : ''}>Match device</option><option value="light" ${th === 'light' ? 'selected' : ''}>Light</option><option value="dark" ${th === 'dark' ? 'selected' : ''}>Dark</option></select></div><p class="note">Signed in as ${esc(S().user.email)}</p><div class="actions"><button class="btn" data-action="logout">Sign out</button></div></section>`;

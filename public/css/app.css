@@ -330,3 +330,15 @@ dl.kv.one { grid-template-columns: 1fr; } .verify { font-weight: 600; } .verify.
 @media (max-width: 560px) { .irow { grid-template-columns: 1fr 40px; } .irow input[type=date] { grid-column: 1 / -1; } }
 .prov h3, .checklist h3 { text-transform: none; letter-spacing: 0; color: var(--ink); font-size: 17px; margin: 0; }
 .panel .actions { margin-top: 12px; }
+.badge-ok { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 2px 6px; }
+.rec small.flag { color: var(--warn); } .rec { flex-wrap: wrap; } .rec .grow { flex: 1 1 220px; }
+/* Phase 3A: résumé panel, review, career cards */
+.resume-panel { margin-top: 14px; } .resume-panel .row1 { display: flex; align-items: center; gap: 8px; }
+.chip-s.s-ok { background: var(--accent-soft); color: var(--accent); } .chip-s.s-bad { background: var(--warn-soft); color: var(--warn); } .chip-s.s-run { background: var(--surface-2); }
+.prop small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; } .prop small.flag { color: var(--warn); } .prop details { margin-top: 4px; } .prop summary { cursor: pointer; font-size: 12px; color: var(--accent); }
+.insights { padding-left: 18px; } .insights small { display: block; color: var(--muted); }
+.careers-rail { align-items: flex-start; } .card.career { width: min(86vw, 360px); min-height: 0; cursor: default; gap: 6px; }
+.card.career h4 { margin: 8px 0 2px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); } .card.career ul { margin: 0; padding-left: 18px; font-size: 14px; } .card.career li { margin: 2px 0; }
+.card.career .foot { flex-wrap: wrap; gap: 6px; pointer-events: auto; } .card.career details summary { cursor: pointer; font-weight: 600; color: var(--accent); min-height: 32px; display: flex; align-items: center; }
+.mini-kv { display: grid; gap: 6px; margin: 8px 0; font-size: 13px; } .mini-kv dt { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; } .mini-kv dd { margin: 0; font-weight: 600; }
+.note.warnline { color: var(--warn); display: flex; gap: 6px; align-items: flex-start; } .note.warnline .i { width: 16px; height: 16px; margin-top: 2px; }

@@ -12,13 +12,17 @@ const { planSearches } = require('./queries');
 const { normalizeListing } = require('./normalize');
 const { upsertJob, sweepStatuses, jobView } = require('./jobs');
 const { rematchUser, strongIds, feedFor } = require('./matcher');
+const careersEngine = require('./careers');
 const notify = require('./notify');
 
-const SEARCH_CLASSES = new Set(['broad', 'location']);
+const SEARCH_CLASSES = new Set(['broad', 'location', 'resume']);
 const LABELS = { queued: 'Search queued', searching: 'Searching for jobs', matching: 'Matching jobs to your profile', updating: 'Updating recommendations', done: 'Results updated', failed: 'Search failed' };
 
 class Pipeline {
-  constructor(db, opts = {}) { this.db = db; this.providers = opts.providers || providers; this.running = false; this.timer = null; this.listeners = []; this.debounceMs = opts.debounceMs ?? config.debounceMs; }
+  constructor(db, opts = {}) { this.db = db;
+    // Crash/restart recovery: a task that was mid-run when the process stopped goes back in the queue (searches are idempotent).
+    db.prepare("UPDATE tasks SET status='queued', stage='queued', run_after=? WHERE status='running'").run(now());
+    this.providers = opts.providers || providers; this.running = false; this.timer = null; this.listeners = []; this.debounceMs = opts.debounceMs ?? config.debounceMs; }
 
   /* ---- queue ---- */
   enqueue(userId, { classes = [], reason = 'profile', force = false, search = null, revision = null } = {}) {
@@ -65,7 +69,7 @@ class Pipeline {
     try {
       const before = strongIds(this.db, userId);
       const result = { searched: false, created: 0, updated: 0, duplicates: 0, errors: [], queries: 0, skippedRecent: 0 };
-      if (scope.search) { this.setStage(task.id, 'searching'); await this.searchForUser(userId, { force: scope.force, result, manual: task.reason === 'manual' }); }
+      if (scope.search) { this.setStage(task.id, 'searching'); await this.searchForUser(userId, { force: scope.force, result, manual: task.reason === 'manual', wide: (scope.classes || []).includes('resume') }); }
       this.setStage(task.id, 'matching');
       sweepStatuses(this.db);
       const m = rematchUser(this.db, userId);
@@ -85,7 +89,7 @@ class Pipeline {
     }
   }
 
-  async searchForUser(userId, { force, result, manual }) {
+  async searchForUser(userId, { force, result, manual, wide }) {
     const profile = getProfile(this.db, userId);
     if (!profile.searchEnabled && !manual) { result.skipped = 'search disabled'; return; }
     const configured = this.providers.filter((p) => p.configured().ok);
@@ -93,7 +97,9 @@ class Pipeline {
     result.searched = true;
     const t0 = now(), dayStart = t0 - 864e5;
     for (const prov of configured) {
-      let plan = planSearches(profile, prov);
+      const careers = careersEngine.compute(this.db, userId, { profile, stats: false, wide });
+      result.careerTerms = careers.searchTerms.length; if (wide) result.expanded = true;
+      let plan = planSearches(profile, prov, wide ? Math.round(config.maxQueriesPerScan * 1.5) : config.maxQueriesPerScan, careers);
       let used = this.db.prepare("SELECT COUNT(*) AS n FROM search_log WHERE provider=? AND started_at>? AND status IN ('ok','failed')").get(prov.id, dayStart).n;
       for (const q of plan) {
         const key = q.key || `${q.what}|${q.where}`;

@@ -71,11 +71,13 @@
       const c = cityOnly(cities[i]); if (c && cityOnly(job.city) === c) return { status: i === 0 ? 'priority' : 'preferred_city', score: i === 0 ? 90 : 85, text: `In ${job.city}${i === 0 ? ' — the exact neighborhood isn’t listed' : ', one of your preferred cities'}`, miles: 0 };
     }
     const jc = num(job.lat) !== null && num(job.lon) !== null ? [Number(job.lat), Number(job.lon)] : coordsFor(job.city || '');
-    if (!jc) return { status: 'unknown', score: 40, text: job.city ? `Distance to ${job.city} unknown` : 'Location not listed' };
+    if (!jc) { const ca0 = /^(ca|california)$/i.test(String(job.state || '').trim()) || /,\s*(ca|california)\b/i.test(job.locationText || ''); if (profile.statewide && ca0) return { status: 'elsewhere_ca', score: 45, text: `In ${job.city || 'California'} — elsewhere in California (distance unknown)` }; return { status: 'unknown', score: 40, text: job.city ? `Distance to ${job.city} unknown` : 'Location not listed' }; }
     let best = null;
     for (const c of cities) { const cc = coordsFor(c); if (cc) { const d = miles(cc, jc); if (best === null || d < best) best = d; } }
     if (best === null) return { status: 'unknown', score: 40, text: 'Add a preferred city to compare distance' };
     const limit = num(profile.commuteMiles) ?? 30;
+    const ca = /^(ca|california)$/i.test(String(job.state || '').trim()) || /,\s*(ca|california)\b/i.test(job.locationText || '');
+    if (best > limit && profile.statewide && ca) return { status: 'elsewhere_ca', score: 45, text: `About ${Math.round(best)} mi away, elsewhere in California (you’re open to California-wide)`, miles: best };
     if (best <= limit) return { status: 'within_commute', score: Math.round(80 - (best / Math.max(limit, 1)) * 20), text: `About ${Math.round(best)} mi from your preferred area (limit ${limit})`, miles: best };
     return { status: 'outside', score: 15, text: `About ${Math.round(best)} mi away — beyond your ${limit}-mile limit`, miles: best };
   }
@@ -88,7 +90,8 @@
     if (floor === null && desired === null) return { status: 'no_preference', score: 60, text: 'Set a salary minimum to compare' };
     if (floor !== null && sal.max < floor) return { status: 'below', score: 0, text: `Top of range ${fmtMoney(sal.max)} is below your ${fmtMoney(floor)} minimum` };
     if (desired !== null && sal.max >= desired) return { status: 'meets_desired', score: 100, text: `Reaches your desired ${fmtMoney(desired)}` };
-    return { status: 'meets_min', score: 75, text: floor !== null ? `Meets your ${fmtMoney(floor)} minimum` : 'Within your range' };
+    const ratio = floor ? (sal.max - floor) / floor : 0; // pay further above the minimum scores higher
+  return { status: 'meets_min', score: Math.round(70 + 25 * (1 - Math.exp(-2 * Math.max(0, ratio)))), text: floor !== null ? `Meets your ${fmtMoney(floor)} minimum (top of range ${fmtMoney(sal.max)})` : 'Within your range' };
   }
 
   /* ---------- field alignment (is this the kind of work she is pointed at?) ---------- */
@@ -98,6 +101,8 @@
     let score = 0;
     const pt = (profile.titles || []).find((t) => { const n = norm(t); if (!n) return false; if (title.includes(n) || n.includes(title)) return true; const a = tokens(t), b = new Set(tokens(job.title)); return a.length && a.filter((w) => b.has(w)).length / a.length >= 0.67; });
     if (pt) { score += 40; ev.push(`Similar to your preferred title “${pt}”`); }
+    const ct = (profile.careerTerms || []).find((c) => { const n = norm(c.term); return n && (title.includes(n) || n.includes(title)); });
+    if (ct) { score += 30; ev.push(`Matches a career path your background supports: ${ct.career}`); }
     const cats = (job.categories || []).filter((c) => (profile.categories || []).includes(c));
     if (cats.length) { score += 20; ev.push(`In your chosen categories: ${cats.join(', ')}`); }
     const edu = (profile.education || []).find((e) => e.field && tokens(e.field).some((w) => jobText.includes(w)));
@@ -118,34 +123,41 @@
   function evalQualifications(job, profile, resumeText) {
     const checks = [];
     const add = (kind, requirement, mandatory, status, note, inferred) => checks.push({ kind, requirement, mandatory, status, note, inferred: !!inferred });
-    const hi = (() => { let best = 0, level = ''; let any = false; for (const e of profile.education || []) { any = true; if (e.status === 'in progress') continue; const r = EDU_RANK[e.level] || 0; if (r > best) { best = r; level = e.level; } } return { rank: best, level, any }; })();
+    /* Statuses: met (confirmed by the user) · reported (the user told us, not yet confirmed) · unknown · unmet. */
+    const edu = (profile.education || []).filter((e) => e.status !== 'in progress');
+    const best = (list) => { let r = 0, lvl = ''; for (const e of list) { const k = EDU_RANK[e.level] || 0; if (k > r) { r = k; lvl = e.level; } } return { rank: r, level: lvl }; };
+    const hiV = best(edu.filter((e) => e.verified !== false)), hiR = best(edu), anyEdu = (profile.education || []).length > 0;
 
     if (job.education && job.education.level) {
-      const need = EDU_RANK[job.education.level] || 0, label = EDU_LABEL[job.education.level], mand = !job.education.preferred;
-      if (!hi.any) add('education', label, mand, 'unknown', 'No education in your profile yet', job.education.inferred);
-      else if (hi.rank >= need) add('education', label, mand, 'met', `You listed ${EDU_LABEL[hi.level]}`, job.education.inferred);
-      else if (!hi.rank) add('education', label, mand, 'unknown', 'Your listed education is still in progress', job.education.inferred);
-      else add('education', label, mand, 'unmet', `Your highest completed is ${EDU_LABEL[hi.level].toLowerCase()}`, job.education.inferred);
+      const need = EDU_RANK[job.education.level] || 0, label = EDU_LABEL[job.education.level], mand = !job.education.preferred, inf = job.education.inferred;
+      if (!anyEdu) add('education', label, mand, 'unknown', 'No education in your profile yet', inf);
+      else if (hiV.rank >= need) add('education', label, mand, 'met', `You confirmed ${EDU_LABEL[hiV.level]}`, inf);
+      else if (hiR.rank >= need) add('education', label, mand, 'reported', `You reported ${EDU_LABEL[hiR.level]}, but haven’t confirmed it yet`, inf);
+      else if (!hiR.rank) add('education', label, mand, 'unknown', 'Your education entries don’t say which degree level you hold (or are in progress)', inf);
+      else add('education', label, mand, 'unmet', `Your highest reported degree is ${EDU_LABEL[hiR.level].toLowerCase()}`, inf);
     }
     if (job.experience && num(job.experience.years)) {
-      const need = num(job.experience.years), field = job.experience.field, mand = !job.experience.preferred;
-      const all = profile.experience || [];
-      const rel = field ? all.filter((e) => norm(e.field) === norm(field) || tokens(field).some((w) => norm(e.title).includes(w))) : all;
-      const years = rel.reduce((s, e) => s + (num(e.years) || 0), 0);
-      const label = `${need}+ years${field ? ' of ' + field.toLowerCase() + ' experience' : ' of experience'}`;
-      if (!all.length) add('experience', label, mand, 'unknown', 'No work experience in your profile yet', job.experience.inferred);
-      else if (years >= need) add('experience', label, mand, 'met', `You listed ${years} years`, job.experience.inferred);
-      else if (years > 0) add('experience', label, mand, 'unmet', `You listed ${years} years`, job.experience.inferred);
-      else add('experience', label, mand, 'unknown', field ? `No ${field.toLowerCase()} experience listed` : 'No years recorded', job.experience.inferred);
+      const need = num(job.experience.years), field = job.experience.field, mand = !job.experience.preferred, all = profile.experience || [];
+      const rel = (list) => (field ? list.filter((e) => norm(e.field) === norm(field) || tokens(field).some((w) => norm(e.title).includes(w) || (e.tags || []).some((t) => norm(t).includes(w)))) : list);
+      const yrs = (list) => list.reduce((t, e) => t + (num(e.years) || 0), 0);
+      const yV = yrs(rel(all.filter((e) => e.verified !== false))), yR = yrs(rel(all));
+      const label = `${need}+ years${field ? ' of ' + field.toLowerCase() + ' experience' : ' of experience'}`, inf = job.experience.inferred;
+      if (!all.length) add('experience', label, mand, 'unknown', 'No work history added yet — that doesn’t mean you lack experience', inf);
+      else if (yV >= need) add('experience', label, mand, 'met', `You confirmed ${yV} years`, inf);
+      else if (yR >= need) add('experience', label, mand, 'reported', `You listed ${yR} years, not all confirmed yet`, inf);
+      else if (yR > 0) add('experience', label, mand, 'unmet', `You listed ${yR} years`, inf);
+      else add('experience', label, mand, 'unknown', field ? `No ${field.toLowerCase()} experience listed (other work may still be relevant)` : 'No years recorded', inf);
     }
-    const held = (profile.certs || []).filter((c) => c.status !== 'in progress'), prog = (profile.certs || []).filter((c) => c.status === 'in progress');
+    const certs = profile.certs || [], held = certs.filter((c) => c.status !== 'in progress'), prog = certs.filter((c) => c.status === 'in progress');
+    const degreeCaution = anyEdu ? ' A degree on its own doesn’t confirm a credential or license.' : '';
     for (const c of job.certifications || []) {
-      const mand = c.required !== false;
-      if (held.some((h) => certMatch(h.name, c.name))) add('cert', c.name, mand, 'met', 'You listed this credential', c.inferred);
+      const mand = c.required !== false, hit = held.find((h) => certMatch(h.name, c.name));
+      if (hit && hit.verified !== false) add('cert', c.name, mand, 'met', 'You confirmed this credential', c.inferred);
+      else if (hit) add('cert', c.name, mand, 'reported', 'You listed it, but haven’t confirmed it yet', c.inferred);
       else if (prog.some((h) => certMatch(h.name, c.name))) add('cert', c.name, mand, 'unknown', 'Marked in progress in your profile', c.inferred);
       else if (!mand) add('cert', c.name, false, 'unknown', 'Preferred; not in your profile', c.inferred);
-      else if ((profile.certs || []).length || profile.certsNone) add('cert', c.name, true, 'unmet', 'Not in your profile', c.inferred);
-      else add('cert', c.name, true, 'unknown', 'You haven’t answered credentials yet', c.inferred);
+      else if (certs.length || profile.certsNone) add('cert', c.name, true, 'unmet', 'Not in your profile — may need to be obtained or verified.' + degreeCaution, c.inferred);
+      else add('cert', c.name, true, 'unknown', 'No credentials recorded yet — verify whether you hold this license.' + degreeCaution, c.inferred);
     }
     const skills = (profile.skills || []).map((s) => norm(typeof s === 'string' ? s : s.name)).filter((s) => s.length > 2), resume = norm(resumeText || '');
     const freeText = (list, mand) => { for (const r of list || []) { const n = norm(r); if (skills.some((s) => n.includes(s))) add('skill', r, mand, 'met', 'Matches a skill you listed'); else add('skill', r, mand, 'unknown', resume ? 'Can’t confirm from your profile' : 'Can’t confirm yet'); } };
@@ -156,7 +168,7 @@
   function qualScore(checks) {
     if (!checks.length) return 50;
     let got = 0, tot = 0;
-    for (const c of checks) { const w = c.mandatory ? 3 : 1; tot += w; got += w * (c.status === 'met' ? 1 : c.status === 'unknown' ? 0.35 : 0); }
+    for (const c of checks) { const w = c.mandatory ? 3 : 1; tot += w; got += w * (c.status === 'met' ? 1 : c.status === 'reported' ? 0.8 : c.status === 'unknown' ? 0.35 : 0); }
     return Math.round((100 * got) / tot);
   }
 
@@ -165,7 +177,7 @@
     ctx = ctx || {};
     const checks = evalQualifications(job, profile, ctx.resumeText);
     const mand = checks.filter((c) => c.mandatory);
-    const unmet = mand.filter((c) => c.status === 'unmet'), mUnknown = mand.filter((c) => c.status === 'unknown'), mMet = mand.filter((c) => c.status === 'met');
+    const unmet = mand.filter((c) => c.status === 'unmet'), mUnknown = mand.filter((c) => c.status === 'unknown'), mMet = mand.filter((c) => c.status === 'met'), mReported = mand.filter((c) => c.status === 'reported');
     const align = evalAlignment(job, profile), salary = evalSalary(job, profile), location = evalLocation(job, profile);
     const types = profile.types || [];
     const typeStatus = !job.type || !types.length ? 'unknown' : types.includes(job.type) ? 'match' : 'mismatch';
@@ -173,7 +185,7 @@
     const qScore = qualScore(checks);
     let qLevel = 'potential';
     if (unmet.length) qLevel = 'needs_more';
-    else if (!mUnknown.length && (mMet.length >= 1 || align.score >= 60)) qLevel = 'strong';
+    else if (!mUnknown.length && !mReported.length && (mMet.length >= 1 || align.score >= 60)) qLevel = 'strong';
 
     const parts = [
       { key: 'qualification', label: 'Qualifications', weight: 35, score: qScore },
@@ -191,6 +203,7 @@
     else if (qLevel === 'strong' && align.score >= 40 && location.status !== 'outside' && location.status !== 'not_preferred') classification = 'strong';
 
     const meets = checks.filter((c) => c.status === 'met').map((c) => `${c.requirement} — ${c.note}`);
+    const unverified = checks.filter((c) => c.status === 'reported').map((c) => `${c.requirement}${c.mandatory ? '' : ' (preferred)'} — ${c.note}`);
     const unknown = checks.filter((c) => c.status === 'unknown').map((c) => `${c.requirement}${c.mandatory ? '' : ' (preferred)'} — ${c.note}`);
     const gaps = checks.filter((c) => c.status === 'unmet').map((c) => `${c.requirement}${c.mandatory ? ' (required)' : ''} — ${c.note}`);
     const reasons = [...align.evidence];
@@ -198,8 +211,8 @@
     if (salary.status === 'meets_desired' || salary.status === 'meets_min') reasons.push(salary.text);
 
     return {
-      classification, overall, capped, parts, reasons, meets, unknown, gaps,
-      qualification: { level: qLevel, score: qScore, checks, mandatoryUnmet: unmet.length, mandatoryUnknown: mUnknown.length },
+      classification, overall, capped, parts, reasons, meets, unverified, unknown, gaps,
+      qualification: { level: qLevel, score: qScore, checks, mandatoryUnmet: unmet.length, mandatoryUnknown: mUnknown.length, mandatoryUnverified: mReported.length },
       salary, location, alignment: align, typeStatus,
       excluded: { belowFloor: salary.status === 'below' },
       explanation: 'Overall relevance is a weighted estimate of how well this listing aligns with the profile you entered: qualifications 35%, field alignment 25%, location 20%, salary 15%, employment type 5%. A required qualification you appear not to meet caps it at 60. It is not a prediction of whether you will be hired.',
@@ -211,7 +224,7 @@
   function visible(jobs, profile, ctx) {
     const showBelow = !!(profile.salary && profile.salary.showBelow);
     return jobs.filter((j) => j.match && !j.userState.dismissed && !j.userState.reported && !['expired', 'possibly_expired', 'closed'].includes(j.status) && (showBelow || !j.match.excluded.belowFloor))
-      .sort((a, b) => b.match.overall - a.match.overall);
+      .sort((a, b) => b.match.overall - a.match.overall || ((annual(b.salaryMin, b.salaryMax, b.salaryPeriod) || { max: 0 }).max - (annual(a.salaryMin, a.salaryMax, a.salaryPeriod) || { max: 0 }).max));
   }
   function buildFeed(jobs, profile, ctx) {
     ctx = ctx || {};
@@ -222,7 +235,8 @@
     push('top', 'Top Matches', 'Strong alignment with the requirements we can verify from your profile.', forYou.filter((j) => j.match.classification === 'strong'), { wide: 2, image: 'career growth' });
     push('new', 'New Opportunities', 'First found since you last visited.', forYou.filter((j) => newIds.has(j.id)));
     push('near', 'Near You', `${(profile.cities && profile.cities[0]) || 'Your area'} first, then the rest of your range.`, vis.filter((j) => isNearby(j.match)).sort((a, b) => a.match.location.score < b.match.location.score ? 1 : -1 || b.match.overall - a.match.overall), { compact: true });
-    push('pay', 'Higher-Paying Opportunities', 'Pay reaches your desired salary.', forYou.filter((j) => j.match.salary.status === 'meets_desired'));
+    const floor = profileFloor(profile), desired = profileDesired(profile), bar = desired !== null ? desired : floor !== null ? floor * 1.15 : null;
+    if (bar !== null) push('pay', 'Higher-Paying Opportunities', desired !== null ? 'Pay reaches your desired salary.' : `Top of range at least 15% above your ${fmtMoney(floor)}/yr minimum.`, forYou.filter((j) => { const a = annual(j.salaryMin, j.salaryMax, j.salaryPeriod); return a && !j.salaryEstimated && a.max >= bar; }).sort((a, b) => annual(b.salaryMin, b.salaryMax, b.salaryPeriod).max - annual(a.salaryMin, a.salaryMax, a.salaryPeriod).max));
     push('explore', 'Worth Exploring', 'Promising, but something needs verifying first.', forYou.filter((j) => j.match.classification === 'potential'), { compact: true });
     const cats = profile.categories || [];
     if (cats.includes('Education') || cats.includes('Special Education')) push('edu', 'Education and Special Education', 'Teaching, administration and program roles.', vis.filter((j) => (j.categories || []).some((c) => c === 'Education' || c === 'Special Education')), { image: 'education' });
@@ -244,7 +258,7 @@
   }
   function completion(p) {
     return [
-      { id: 'education', label: 'Education', done: (p.education || []).length > 0 }, { id: 'experience', label: 'Work Experience', done: (p.experience || []).length > 0 },
+      { id: 'education', label: 'Education', done: (p.education || []).length > 0, review: (p.education || []).filter((e) => e.verified === false).length }, { id: 'experience', label: 'Work Experience', done: (p.experience || []).length > 0 },
       { id: 'skills', label: 'Skills', done: (p.skills || []).length > 0 }, { id: 'certs', label: 'Certifications and Licenses', done: (p.certs || []).length > 0 || !!p.certsNone },
       { id: 'resume', label: 'Résumé', done: !!p.resume }, { id: 'prefs', label: 'Job Preferences', done: (p.categories || []).length > 0 || (p.titles || []).length > 0 },
       { id: 'location', label: 'Location', done: (p.cities || []).length > 0 }, { id: 'salary', label: 'Salary', done: profileFloor(p) !== null }, { id: 'notify', label: 'Notification Preferences', done: true },

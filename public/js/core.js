@@ -43,7 +43,7 @@
     try { res = await fetch(path, init); A.S.offline = false; } catch (_) { A.S.offline = true; A.renderBanners && A.renderBanners(); throw Object.assign(new Error('Can’t reach the server. Showing the last results that loaded.'), { offline: true }); }
     let data = null; try { data = await res.json(); } catch (_) { /* non-JSON */ }
     if (res.status === 401 && !opts.quiet) { A.S.user = null; A.render(); throw Object.assign(new Error('Please sign in.'), { status: 401 }); }
-    if (!res.ok) throw Object.assign(new Error((data && data.error) || `Request failed (${res.status})`), { status: res.status });
+    if (!res.ok) throw Object.assign(new Error((data && data.error) || `Request failed (${res.status})`), { status: res.status, conflict: data && data.conflict });
     return data;
   };
 

@@ -1,5 +1,5 @@
 // Dev harness for browser checks: real server + MOCK job source and MOCK photo service (fictional fixtures; never used by the app itself).
-process.env.NODE_ENV='test'; process.env.SCHEDULER_ENABLED='false'; process.env.RESCAN_DEBOUNCE_MS='700'; process.env.MAIL_TRANSPORT='json'; process.env.MAIL_FROM='x@y.z';
+process.env.NODE_ENV='test'; process.env.SCHEDULER_ENABLED='false'; process.env.RESCAN_DEBOUNCE_MS='700'; process.env.INITIAL_PROFILE_FILE=require('path').join(__dirname,'..','..','config','initial-profile.json');
 process.env.DATA_DIR=require('fs').mkdtempSync('/tmp/kother-ui-');
 const http=require('http');
 const day=(n)=>new Date(Date.now()+n*864e5).toISOString();

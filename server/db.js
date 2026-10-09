@@ -11,8 +11,8 @@ CREATE TABLE IF NOT EXISTS profiles (user_id INTEGER PRIMARY KEY REFERENCES user
 CREATE TABLE IF NOT EXISTS profile_records (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, kind TEXT NOT NULL, data TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'user', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_records_user ON profile_records(user_id, kind);
 CREATE TABLE IF NOT EXISTS profile_revisions (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, revision INTEGER NOT NULL, change_class TEXT NOT NULL, summary TEXT NOT NULL, snapshot TEXT NOT NULL, created_at INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS resumes (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, filename TEXT NOT NULL, stored_name TEXT NOT NULL, mime TEXT, size INTEGER, text TEXT DEFAULT '', created_at INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS resume_proposals (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, resume_id INTEGER NOT NULL REFERENCES resumes(id) ON DELETE CASCADE, kind TEXT NOT NULL, data TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending');
+CREATE TABLE IF NOT EXISTS resumes (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, filename TEXT NOT NULL, stored_name TEXT NOT NULL, mime TEXT, size INTEGER, text TEXT DEFAULT '', created_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'processing', error TEXT, insights TEXT, analyzed_at INTEGER, accepted_count INTEGER NOT NULL DEFAULT 0, rejected_count INTEGER NOT NULL DEFAULT 0, duplicate_count INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS resume_proposals (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, resume_id INTEGER NOT NULL REFERENCES resumes(id) ON DELETE CASCADE, kind TEXT NOT NULL, data TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', origin TEXT NOT NULL DEFAULT 'stated', evidence TEXT NOT NULL DEFAULT '[]', grp TEXT);
 CREATE TABLE IF NOT EXISTS jobs (
   id INTEGER PRIMARY KEY, provider TEXT NOT NULL, external_id TEXT NOT NULL, fingerprint TEXT NOT NULL, url_key TEXT,
   title TEXT NOT NULL, employer TEXT NOT NULL, city TEXT, state TEXT, location_text TEXT, neighborhood TEXT, lat REAL, lon REAL,
@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, user_id INTEGE
 CREATE TABLE IF NOT EXISTS push_subscriptions (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, endpoint TEXT UNIQUE NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS images (topic TEXT PRIMARY KEY, data TEXT NOT NULL, fetched_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS career_prefs (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, occupation_id TEXT NOT NULL, state TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(user_id, occupation_id));
 `;
 
 function open(file) {
@@ -43,7 +44,14 @@ function open(file) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
+}
+/* Add columns introduced after a database was first created (SCHEMA only covers fresh databases). */
+function ensureColumn(db, table, col, def) { if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`); }
+function migrate(db) {
+  for (const [c, d] of [['status', "TEXT NOT NULL DEFAULT 'ready'"], ['error', 'TEXT'], ['insights', 'TEXT'], ['analyzed_at', 'INTEGER'], ['accepted_count', 'INTEGER NOT NULL DEFAULT 0'], ['rejected_count', 'INTEGER NOT NULL DEFAULT 0'], ['duplicate_count', 'INTEGER NOT NULL DEFAULT 0']]) ensureColumn(db, 'resumes', c, d);
+  for (const [c, d] of [['origin', "TEXT NOT NULL DEFAULT 'stated'"], ['evidence', "TEXT NOT NULL DEFAULT '[]'"], ['grp', 'TEXT']]) ensureColumn(db, 'resume_proposals', c, d);
 }
 const now = () => Date.now();
 const j = (v, d) => { try { return v ? JSON.parse(v) : d; } catch (_) { return d; } };

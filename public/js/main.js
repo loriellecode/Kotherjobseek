@@ -14,7 +14,8 @@
   A.loadAll = async function () {
     const b = await A.api('GET', '/api/bootstrap', undefined, { quiet: true });
     Object.assign(S, { user: b.user, profile: b.profile, status: b.status, providers: b.providers, config: b.config, unread: b.unread });
-    const [feed, apps, notes] = await Promise.all([A.api('GET', '/api/feed'), A.api('GET', '/api/applications'), A.api('GET', '/api/notifications')]);
+    const [feed, apps, notes, resume, careers] = await Promise.all([A.api('GET', '/api/feed'), A.api('GET', '/api/applications'), A.api('GET', '/api/notifications'), A.api('GET', '/api/resume'), A.api('GET', '/api/careers')]);
+    S.resume = resume; S.careers = careers;
     S.apps = Object.fromEntries(apps.applications.map((a) => [a.jobId, a])); S.notes = notes.notifications; S.unread = notes.unread;
     let last = 0; try { last = Number(localStorage.getItem('kj.lastVisit') || 0); } catch (_) { /* storage blocked */ }
     S.jobs = feed.jobs; if (!ses.newIds.size) feed.jobs.forEach((j) => { if (j.userState.firstSurfaced && j.userState.firstSurfaced > last) ses.newIds.add(j.id); });
@@ -22,8 +23,8 @@
   };
   A.refreshFeed = async function () {
     try {
-      const [feed, b] = await Promise.all([A.api('GET', '/api/feed'), A.api('GET', '/api/bootstrap')]);
-      setJobs(feed.jobs, true); S.profile = b.profile; S.providers = b.providers; S.unread = b.unread; S.status = feed.status;
+      const [feed, b, cr] = await Promise.all([A.api('GET', '/api/feed'), A.api('GET', '/api/bootstrap'), A.api('GET', '/api/careers')]);
+      S.careers = cr; setJobs(feed.jobs, true); S.profile = b.profile; S.providers = b.providers; S.unread = b.unread; S.status = feed.status;
       const n = await A.api('GET', '/api/notifications'); S.notes = n.notifications; S.unread = n.unread;
       A.render(true);
     } catch (_) { /* offline banner already shown */ }
@@ -87,6 +88,17 @@
 
   /* ---------- actions ---------- */
   const jobAction = async (fn) => { try { await fn(); } catch (e) { if (e.status !== 401) A.toast(e.message); } };
+  A.setBusy = (msg) => { S.busy = msg; A.renderBanners(); };
+  async function decide(id, action, body) {
+    try {
+      const r = await A.api('POST', `/api/resume/proposals/${id}/${action}`, body);
+      S.resume = { resume: r.resume, proposals: r.proposals }; if (r.profile) { S.profile = r.profile; S.status = r.status; if (r.queued) A.pollStatus(); }
+      A.render(true); A.editors.resumeReview(S.resume, action === 'accept' ? (r.queued ? 'Added to your profile. Updating your matches…' : 'Done.') : undefined);
+    } catch (e) {
+      if (e.status === 409 && e.conflict) return A.editors.conflictDialog(id, e.conflict, body && body.data);
+      throw e;
+    }
+  }
   async function setSaved(id) {
     const j = A.job(id), on = !j.userState.saved;
     await A.api(on ? 'PUT' : 'DELETE', `/api/jobs/${id}/saved`); j.userState.saved = on ? Date.now() : null; A.render(true); A.toast(on ? 'Saved. Find it under Saved.' : 'Removed from Saved');
@@ -112,7 +124,7 @@
     const a = t.dataset.action, id = t.dataset.id;
     if (a === 'scrim') { if (e.target === t) A.closeModal(); return; }
     if (a === 'apply-opened') { ses.applyNote = Number(id); if (route().r === 'job') setTimeout(() => A.render(true), 0); return; }
-    if (t.tagName === 'SELECT' || t.tagName === 'INPUT') return;
+    if (t.tagName === 'SELECT' || (t.tagName === 'INPUT' && t.type !== 'button')) return;
     e.stopPropagation();
     const run = (fn) => jobAction(fn);
     const H = {
@@ -128,10 +140,20 @@
       edit: () => A.editors.open(t.dataset.sec),
       'rec-add': () => A.editors.recordForm(t.dataset.kind, t.dataset.sec), 'rec-back': () => A.editors.open(t.dataset.sec),
       'rec-edit': () => { const sec = { education: 'education', experience: 'experience', cert: 'certs', skill: 'skills' }[t.dataset.kind]; const rec = S.profile[sec === 'certs' ? 'certs' : sec].find((r) => r.id === Number(id)); A.editors.recordForm(t.dataset.kind, sec, rec); },
+      'rec-confirm': () => run(async () => { const k = t.dataset.kind, sec = { education: 'education', experience: 'experience', cert: 'certs' }[k]; const rec = S.profile[sec].find((r) => r.id === Number(id)); const { id: _i, source: _s, ...body } = rec; const r = await A.api('PUT', `/api/profile/${k}/${id}`, Object.assign(body, { verified: true })); A.afterProfile(r, true); A.toast('Confirmed. Updating your matches…'); A.editors.open(sec); }),
       'rec-delete': () => run(async () => { const k = t.dataset.kind, sec = { education: 'education', experience: 'experience', cert: 'certs', skill: 'skills' }[k]; const r = await A.api('DELETE', `/api/profile/${k}/${id}`); A.afterProfile(r); A.editors.open(sec); }),
-      'resume-delete': () => run(async () => { await A.api('DELETE', '/api/resume'); S.profile.resume = null; A.editors.resumeEditor(null); A.render(true); A.toast('Résumé deleted.'); }),
-      'prop-accept': () => run(async () => { const r = await A.api('POST', `/api/resume/proposals/${id}/accept`, {}); A.afterProfile(r, true); A.toast('Added to your profile.'); const p = await A.api('GET', '/api/resume'); A.editors.resumeEditor(p.proposals); }),
-      'prop-reject': () => run(async () => { await A.api('POST', `/api/resume/proposals/${id}/reject`, {}); const p = await A.api('GET', '/api/resume'); A.editors.resumeEditor(p.proposals); }),
+      'resume-upload': () => document.getElementById('resume-in').click(),
+      'resume-review': () => run(async () => { S.resume = await A.api('GET', '/api/resume'); A.editors.resumeReview(S.resume); }),
+      'resume-retry': () => run(async () => { A.setBusy('Re-reading your résumé'); try { S.resume = await A.api('POST', '/api/resume/retry'); } finally { A.setBusy(null); } A.render(true); if (S.resume.resume && S.resume.resume.status === 'ready' && S.resume.proposals.length) A.editors.resumeReview(S.resume); else if (S.resume.resume && S.resume.resume.status === 'failed') A.toast('Analysis failed again: ' + S.resume.resume.error); }),
+      'resume-remove': () => run(async () => { if (!confirm('Remove your résumé? The stored file is deleted from the server. Profile entries you already accepted are kept.')) return; const r = await A.api('DELETE', '/api/resume'); S.resume = { resume: null, proposals: [] }; const b = await A.api('GET', '/api/bootstrap'); S.profile = b.profile; A.render(true); A.toast(r.fileDeleted ? 'Résumé removed and the stored file deleted.' : 'Résumé removed, but the file could not be deleted — contact the operator.'); }),
+      'prop-accept': () => run(() => decide(id, 'accept', {})),
+      'prop-reject': () => run(() => decide(id, 'reject', {})),
+      'prop-edit': () => A.editors.proposalEdit(S.resume.proposals.find((p) => p.id === Number(id))),
+      'prop-resolve': () => run(() => decide(id, 'accept', Object.assign({ mode: t.dataset.mode }, A.session.pendingEdit ? { data: A.session.pendingEdit } : {}))),
+      'prop-accept-all': () => run(async () => { for (const p of S.resume.proposals.filter((x) => x.origin === 'stated' && !x.conflict && !x.data.flag && x.kind !== 'cert')) { const r = await A.api('POST', `/api/resume/proposals/${p.id}/accept`, {}); S.resume = { resume: r.resume, proposals: r.proposals }; S.profile = r.profile; S.status = r.status; } A.pollStatus(); A.render(true); A.editors.resumeReview(S.resume, 'Added. Your searches are being expanded.'); }),
+      'resume-finish': () => run(async () => { const r = await A.api('POST', '/api/resume/finish'); S.resume = await A.api('GET', '/api/resume'); A.closeModal(); A.render(true); A.toast(r.message); if (r.searchExpanded) A.pollStatus(); }),
+      'career-state': () => run(async () => { const r = await A.api('PUT', `/api/careers/${id}`, { state: t.dataset.state }); S.careers = r; S.status = r.status; A.pollStatus(); A.render(true); A.toast(t.dataset.state === 'include' ? 'Included. Searching for these roles…' : t.dataset.state === 'exclude' ? 'Hidden, and left out of future searches.' : 'Restored.'); }),
+      'career-view': () => { ses.q = t.dataset.q; ses.cat = 'For You'; A.render(); window.scrollTo(0, 0); },
       'int-add': () => document.getElementById('ints').insertAdjacentHTML('beforeend', A.intRow({})), 'int-rm': () => t.closest('.irow').remove(),
       untrack: () => run(async () => { await A.api('DELETE', `/api/applications/${id}`); delete S.apps[id]; A.closeModal(); A.render(true); A.toast('Stopped tracking this job.'); }),
       'search-now': () => run(searchNow), 'retry-search': () => run(searchNow), 'dismiss-status': () => { S.status = Object.assign({}, S.status, { dismissed: true }); A.renderBanners(); },
@@ -155,8 +177,15 @@
     if (t.id === 'file-in') importFile(t.files[0]), (t.value = '');
     else if (t.dataset.action === 'theme') { try { localStorage.setItem('kj.theme', t.value); } catch (_) { /* ignore */ } applyTheme(); }
     else if (t.dataset.action === 'resume-pick' && t.files[0]) jobAction(async () => {
-      const f = t.files[0]; const r = await A.api('POST', '/api/resume', f, { headers: { 'x-filename': encodeURIComponent(f.name), 'content-type': 'application/octet-stream' } });
-      const b = await A.api('GET', '/api/bootstrap'); S.profile = b.profile; A.render(true); A.editors.resumeEditor(r.proposals, r.textExtracted ? r.note : 'Uploaded, but no text could be read from this file, so there are no suggestions. Matching will use your profile entries only.');
+      const f = t.files[0]; t.value = ''; A.setBusy('Uploading and reading your résumé');
+      try {
+        const r = await A.api('POST', '/api/resume', f, { headers: { 'x-filename': encodeURIComponent(f.name), 'content-type': 'application/octet-stream' } });
+        S.resume = { resume: r.resume, proposals: r.proposals }; const b = await A.api('GET', '/api/bootstrap'); S.profile = b.profile;
+      } finally { A.setBusy(null); }
+      A.render(true);
+      const R = S.resume.resume;
+      if (R.status === 'failed') A.toast('We couldn’t read that résumé. You can retry, upload another file, or enter your information manually.');
+      else if (S.resume.proposals.length) A.editors.resumeReview(S.resume); else A.toast('Résumé read. No major new information was detected, so nothing needs review and your searches were not expanded.');
     });
   });
   async function importFile(file) {
@@ -192,6 +221,7 @@
         const r = await A.api('PUT', `/api/applications/${id}`, { status: fd.get('status'), appliedOn: fd.get('appliedOn') || null, response: fd.get('response'), notes: fd.get('notes'), closedReason: fd.get('closedReason'), interviews: ints });
         S.apps[id] = r.application; A.closeModal(); A.render(true); A.toast('Application updated.');
       } else if (kind === 'report') { const id = f.dataset.id; await A.api('PUT', `/api/jobs/${id}/report`, { reason: fd.get('reason') }); A.job(id).userState.reported = fd.get('reason'); A.closeModal(); location.hash = '#/discover'; A.render(); A.toast('Reported and hidden. Thank you.', 'Undo', 'restore-report', id); }
+      else if (kind === 'prop-edit') { const body = Object.fromEntries(fd.entries()); await decide(f.dataset.id, 'accept', { data: body }); }
       else if (kind === 'delete-account') { await A.api('DELETE', '/api/account', { password: fd.get('password') }); A.closeModal(); Object.assign(S, { user: null, jobs: [], profile: null, loaded: false }); A.render(); A.toast('Your account was deleted.'); }
     };
     go().catch((err) => { if (err.status !== 401 || kind === 'auth') formErr(f, err.message); }).finally(done);
@@ -227,6 +257,7 @@
   (async function boot() {
     applyTheme();
     const inp = document.createElement('input'); inp.type = 'file'; inp.id = 'file-in'; inp.accept = '.json,application/json'; inp.hidden = true; document.body.appendChild(inp);
+    const rin = document.createElement('input'); rin.type = 'file'; rin.id = 'resume-in'; rin.accept = '.pdf,.docx'; rin.hidden = true; rin.dataset.action = 'resume-pick'; document.body.appendChild(rin);
     S.booting = true; A.render();
     try { await A.loadAll(); } catch (err) { if (err.status !== 401 && !err.offline) ses.error = err.message; }
     S.booting = false; A.render();
