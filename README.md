@@ -1,7 +1,8 @@
 # Kother — personalized, editorial job discovery
 
 An Apple News–inspired feed that finds **real** current job listings through permitted APIs/feeds, matches them transparently
-against a profile you control, and re-scans automatically whenever the profile changes. **Not deployed.**
+against a profile you control, and re-scans automatically whenever the profile changes.
+**Runs on your own computer (`npm run local`); it is not deployed to the internet** — see “Running it for one person” below.
 
 Stack: Node ≥ 22.5 (built-in `node:sqlite`, no web framework) · vanilla JS client · SQLite · `web-push`, `pdf-parse`, `mammoth`, `jszip`.
 No build step. **There is no email anywhere in the app** (alerts are in-app and optional web push only).
@@ -12,6 +13,24 @@ cp .env.example .env     # fill in the keys you have
 npm start                # http://localhost:3000 → create the account
 npm test                 # 73 tests run, 3 more live-provider checks skip without credentials
 ```
+
+## Running it for one person (free, private, on her computer)
+GitHub Pages can only host static pages, so it cannot run this app (login, résumé storage, job searches and secret keys need a server). The free, private way to use it is on her own computer:
+1. Install Node 22.5 or newer (https://nodejs.org). 2. In this folder run `npm install` once. 3. Run `npm run local` — it starts the app and opens http://localhost:3000.
+Her data (database and résumé files) stays in `./data` on that computer. To reach it from her phone on the same Wi-Fi, run `HOST=0.0.0.0 npm start` and open `http://<computer-ip>:3000` — only do this on a network you trust.
+Live job listings still need free API keys in `.env` (Adzuna and/or USAJOBS); without keys the app opens but shows no listings.
+
+## Photos
+With a `PEXELS_API_KEY` the app uses Pexels photos (credited). Without one it uses **your own free photos**: put `.jpg`/`.png`/`.webp` files in `public/photos/<topic>/` (topics: `finance`, `business`, `education`, `special-education`, `workforce`, `banking`, `remote-work`, `workplace`, `professional-development`, `career-growth`) or `public/photos/any/` for all topics, and credit them in `public/photos/credits.json`: `{ "finance/desk.jpg": { "photographer": "Name", "url": "https://…" } }`. No photos are bundled in this repository (the build environment had no internet to download any), and the app never shows a photo as a picture of a specific employer.
+
+## Job trust statuses
+Listings are not “verified/unverified”. Each gets one of five graded statuses with the reasons, evidence and time checked (open **Why this status** on a job): **Trusted source** (government/school/university site, the employer’s own careers feed, or an established job platform), **Application destination checked** (a recognised applicant-tracking system such as Workday, Greenhouse or Lever, or an address consistent with the employer), **Needs a closer look** (employer connection not confirmed — still shown), **High risk** (look-alike addresses, shorteners, IP/local hosts, sensitive-data requests — the apply action is hidden), **Blocked** (unsafe schemes, embedded credentials, upfront-payment requests — quarantined, not shown). Recognised names are evidence, not a pass, and nothing is ever described as guaranteed or fully verified.
+* **Automated:** URL validation/normalisation, look-alike and impersonation patterns, listing-text patterns (fees, gift cards, Social Security/bank requests, private-messaging, implausible pay), expiry dates, support from other sources listing the same job, and — on **Re-check** — a guarded fetch of the application page (public addresses only, ≤3 re-validated redirects, 200 KB, text only, never executed).
+* **Not done:** confirming the employer exists in a business registry, reputation services (e.g. Google Safe Browsing), and checking whether the employer’s own website lists the job. Set `TRUST_NETWORK_CHECKS=false` to disable live page checks.
+* Kother never submits an application or sends anything for you.
+
+## Job Email Assistant
+For listings that apply by email: write, correct, professionalise, shorten, tailor, and follow-up drafts from your *confirmed* profile only (placeholders for anything missing). It **never sends email** — copy it, open it in your email app (`mailto:`, plain text), or download an `.eml` draft. Optional AI wording needs `ANTHROPIC_API_KEY` (and per-request consent); without it the built-in editor is used. Not yet tested against the live Anthropic API.
 
 ## Setup checklist (nothing is simulated — missing keys mean no listings)
 | Feature | Needed | Where |

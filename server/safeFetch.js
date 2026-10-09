@@ -21,6 +21,7 @@ function isPublicIp(ip) {
   return false;
 }
 async function resolvePublic(host, opts) {
+  if (!net.isIP(host) && (host === 'localhost' || !host.includes('.') || /\.(local|localhost|internal|lan|home|corp)$/i.test(host))) { if (!opts.allowPrivate) throw new Error('blocked address'); }
   if (net.isIP(host)) { if (!opts.allowPrivate && !isPublicIp(host)) throw new Error('blocked address'); return host; }
   const list = await (opts.lookup || ((h) => dns.lookup(h, { all: true })))(host);
   const addrs = (Array.isArray(list) ? list : [list]).map((x) => x.address || x);

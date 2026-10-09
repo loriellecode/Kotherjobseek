@@ -179,7 +179,7 @@ function assess(listing, ctx) {
       if (idx >= 0 && pg.ok) notDone[idx] = 'Whether the employer’s own website lists this job (only the application page itself was checked)';
     }
   }
-  const out = base(status, { host, url: status === 'blocked' ? null : url });
+  const out = base(status, { host, url });
   out.expired = sig.expired;
   return out;
 }

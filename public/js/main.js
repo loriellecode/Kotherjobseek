@@ -76,9 +76,9 @@
       const t = el.dataset.imgTopic, vi = el.dataset.imgI || '0', key = t + '#' + vi;
       if (!(key in ses.images)) ses.images[key] = A.api('GET', '/api/imagery/' + encodeURIComponent(t) + (vi !== '0' ? '?i=' + vi : ''), undefined, { quiet: true }).then((r) => r.photo).catch(() => null);
       const p = await ses.images[key];
-      if (!p || !document.body.contains(el) || !/^https:\/\/images\.pexels\.com\//.test(p.src.medium)) return;
+      if (!p || !document.body.contains(el) || !/^(https:\/\/images\.pexels\.com\/|\/photos\/)/.test(p.src.medium)) return;
       const banner = el.classList.contains('banner'), alt = p.alt || '';
-      const credit = `<a href="${esc(p.pageUrl)}" target="_blank" rel="noopener noreferrer">Photo by ${esc(p.photographer)}</a> on <a href="https://www.pexels.com" target="_blank" rel="noopener noreferrer">Pexels</a>`;
+      const px = p.source === 'Pexels', who = esc(p.photographer), credit = p.pageUrl ? `<a href="${esc(p.pageUrl)}" target="_blank" rel="noopener noreferrer">Photo by ${who}</a>${px ? ' on <a href="https://www.pexels.com" target="_blank" rel="noopener noreferrer">Pexels</a>' : ''}` : `Photo: ${who}`;
       if (el.dataset.hero) { el.style.setProperty('--photo', `url(${p.src.large2x && window.innerWidth > 1400 ? p.src.large2x : p.src.large})`); el.classList.add('has-photo'); const c = el.closest('.hero').querySelector('.hero-credit'); if (c) c.innerHTML = credit; el.hidden = false; return; }
       if (el.dataset.card) { el.innerHTML = `<img src="${esc(p.src.medium)}" srcset="${esc(p.src.small)} 350w, ${esc(p.src.medium)} 940w" sizes="340px" alt="" loading="lazy" decoding="async" style="background:${esc(p.avgColor || 'transparent')}"><a class="credit" href="${esc(p.pageUrl)}" target="_blank" rel="noopener noreferrer" title="Photo by ${esc(p.photographer)} on Pexels">Photo: ${esc(p.photographer)} · Pexels</a>`; el.hidden = false; return; }
       if (banner) el.innerHTML = `<img src="${esc(p.src.large)}" srcset="${esc(p.src.small)} 350w, ${esc(p.src.medium)} 940w, ${esc(p.src.large)} 1280w, ${esc(p.src.large2x)} 2400w" sizes="(min-width: 1180px) 1120px, 100vw" width="${p.width}" height="${p.height}" alt="${esc(alt)}" loading="lazy" decoding="async" style="background:${esc(p.avgColor || 'var(--surface-2)')}"><span class="credit">${credit}</span>`;

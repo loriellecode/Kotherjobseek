@@ -3,6 +3,8 @@
  * the browser only receives photo URLs (Pexels CDN) plus the attribution Pexels asks for. Results are cached for a week
  * to stay well inside the 200 requests/hour default limit. These photos illustrate topics — they are never
  * presented as a picture of any employer or workplace. */
+const fs = require('node:fs');
+const path = require('node:path');
 const config = require('./config');
 const { now, j } = require('./db');
 
@@ -13,7 +15,23 @@ const TOPICS = {
 };
 const TTL = 7 * 864e5;
 
-function status() { return config.pexels.key ? { configured: true } : { configured: false, missing: ['PEXELS_API_KEY'] }; }
+const PHOTO_DIR = path.join(__dirname, '..', 'public', 'photos');
+const slug = (t) => String(t).replace(/[^a-z0-9]+/g, '-');
+/* Your own free photos: put .jpg/.jpeg/.png/.webp files in public/photos/<topic>/ (e.g. public/photos/finance/) — or public/photos/any/ for all topics —
+ * and optionally credit them in public/photos/credits.json: { "finance/desk.jpg": { "photographer": "Name", "url": "https://…" } }. Used only when no Pexels key is set. */
+function localPhotos(topic) {
+  let credits = {}; try { credits = JSON.parse(fs.readFileSync(path.join(PHOTO_DIR, 'credits.json'), 'utf8')); } catch (_) { /* optional */ }
+  const out = [];
+  for (const dir of [slug(topic), 'any']) {
+    let files = []; try { files = fs.readdirSync(path.join(PHOTO_DIR, dir)).filter((f) => /^[\w.\- ]+\.(jpe?g|png|webp)$/i.test(f)).sort(); } catch (_) { continue; }
+    for (const f of files) { const rel = `${dir}/${f}`, c = credits[rel] || {}, src = '/photos/' + rel.split('/').map(encodeURIComponent).join('/');
+      out.push({ id: rel, pageUrl: /^https:\/\//.test(c.url || '') ? c.url : '', photographer: c.photographer || 'a free-license photographer', photographerUrl: '', alt: '', avgColor: null, width: 1600, height: 1067, src: { small: src, medium: src, large: src, large2x: src }, source: c.source || 'Free photo', license: c.license || '' }); }
+    if (out.length) break;
+  }
+  return out;
+}
+const localCount = () => { try { return fs.readdirSync(PHOTO_DIR, { recursive: true }).filter((f) => /\.(jpe?g|png|webp)$/i.test(f)).length; } catch (_) { return 0; } };
+function status() { return config.pexels.key ? { configured: true } : localCount() ? { configured: true, local: true } : { configured: false, missing: ['PEXELS_API_KEY (or your own photos in public/photos/)'] }; }
 
 const KEEP = 8;
 const shape = (pick) => ({ id: pick.id, pageUrl: pick.url, photographer: pick.photographer, photographerUrl: pick.photographer_url, alt: pick.alt || '', avgColor: pick.avg_color || null, width: pick.width, height: pick.height,
@@ -25,7 +43,7 @@ const listOf = (d) => (d && Array.isArray(d.list) ? d.list : d && d.id ? [d] : [
 async function getImage(db, topic, variant) {
   topic = String(topic || '').toLowerCase();
   if (!TOPICS[topic]) return { configured: status().configured, photo: null, error: 'unknown topic' };
-  if (!config.pexels.key) return { configured: false, photo: null };
+  if (!config.pexels.key) { const l = localPhotos(topic); return l.length ? { configured: true, photo: choose(l, variant), local: true } : { configured: false, photo: null }; }
   const row = db.prepare('SELECT * FROM images WHERE topic=?').get(topic);
   if (row && now() - row.fetched_at < TTL) return { configured: true, photo: choose(listOf(j(row.data, null)), variant) };
   try {

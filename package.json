@@ -10,7 +10,8 @@
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
     "seed": "node --disable-warning=ExperimentalWarning scripts/seed-profile.js",
     "reset-password": "node --disable-warning=ExperimentalWarning scripts/reset-password.js",
-    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
+    "local": "node scripts/local.js"
   },
   "dependencies": {
     "jszip": "^3.10.2",
