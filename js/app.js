@@ -39,6 +39,11 @@
     const img = j.logoUrl ? `<img src="${esc(j.logoUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
     return `<span class="mono">${img || esc(initials(j.employer))}</span>`;
   }
+  const hue = (str) => { let h = 0; for (const c of String(str)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+  function art(j, cls) {
+    const img = j.logoUrl ? `<img src="${esc(j.logoUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
+    return `<div class="art ${cls || ''}" style="--h:${hue(j.employer)}" aria-hidden="true">${img || `<span class="wm">${esc(j.employer.replace(/^example\s+/i, ''))}</span>`}</div>`;
+  }
   const sampleTag = (j) => (j.sample ? '<span class="badge-sample">Sample</span>' : '');
 
   function matchBadge(ev) {
@@ -55,35 +60,42 @@
   function card({ job: j, ev }, variant) {
     const isNew = session.newIds.has(j.id);
     const blurb = variant === 'wide' ? (ev.reasons[0] ? ev.reasons.slice(0, 2).join('. ') + '.' : j.summary) : '';
+    const more = j.remote ? 'Remote' : (j.categories || [])[0] || 'Nearby';
+    const tags = j.sample || isNew ? `<div class="tags">${sampleTag(j)}${isNew ? '<span class="badge-new">New</span>' : ''}</div>` : '';
     return `<article class="card ${variant || ''}" data-job="${esc(j.id)}">
       <a class="open" href="#/job/${encodeURIComponent(j.id)}" aria-label="${esc(j.title)}, ${esc(j.employer)}"></a>
-      <div class="top">${variant === 'compact' ? '' : logo(j)}<span class="employer">${esc(j.employer)}</span></div>
-      ${j.sample || isNew ? `<div class="tags">${sampleTag(j)}${isNew ? '<span class="badge-new">New</span>' : ''}</div>` : ''}
+      ${variant === 'compact' ? '' : `<div class="artwrap">${art(j)}${tags}</div>`}
+      <div class="employer">${esc(j.employer)}${variant === 'compact' ? ' ' + sampleTag(j) + (isNew ? ' <span class="badge-new">New</span>' : '') : ''}</div>
       <h3>${esc(j.title)}</h3>
       <div class="meta">${esc(shortWhere(j))}${j.type ? ' · ' + esc(j.type) : ''}</div>
       <div class="pay">${esc(pay(j))}</div>
       ${blurb ? `<p class="blurb">${esc(blurb)}</p>` : ''}
-      <div class="foot">${matchBadge(ev)}<span class="grow"></span>${jobButtons(j)}</div>
+      <div>${matchBadge(ev)}</div>
+      <div class="foot"><button class="pill" data-action="more" data-cat="${esc(more)}">More in ${esc(more)}</button><span class="grow"></span>${jobButtons(j)}</div>
     </article>`;
   }
 
   function featuredCard({ job: j, ev }, label) {
     const isNew = session.newIds.has(j.id);
     const why = ev.reasons.length ? ev.reasons.slice(0, 3) : [];
-    const visual = j.logoUrl ? `<img src="${esc(j.logoUrl)}" alt="${esc(j.employer)} logo" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'wordmark',textContent:this.alt.replace(' logo','')}))">` : `<div class="wordmark" aria-hidden="true">${esc(j.employer)}</div>`;
     const apply = j.url ? `<a class="btn primary" href="${esc(j.url)}" target="_blank" rel="noopener noreferrer" data-action="apply-opened" data-id="${esc(j.id)}">Apply on employer site ${icon('ext')}</a>`
       : `<span class="btn primary" aria-disabled="true">${j.sample ? 'Sample listing — no link' : 'No application link'}</span>`;
+    const saved = !!state.saved[j.id];
+    const dl = j.deadline ? fmtDate(j.deadline) : 'Not listed';
     return `<article class="featured" data-open="${esc(j.id)}">
       <div class="body">
-        <div class="eyebrow-line">${esc(label || 'Featured')} · ${KJ.LEVEL_LABEL[ev.level]} ${isNew ? '<span class="badge-new">New</span>' : ''} ${sampleTag(j)}</div>
+        <div class="eyebrow-line">${esc(label || 'Featured')} ${isNew ? '<span class="badge-new">New</span>' : ''} ${sampleTag(j)}</div>
         <h2><a href="#/job/${encodeURIComponent(j.id)}" style="text-decoration:none">${esc(j.title)}</a></h2>
         <div class="employer">${esc(j.employer)}</div>
-        <div class="facts"><span>${esc(where(j))}</span><span class="pay">${esc(pay(j))}</span><span>${esc(j.type || '')}</span></div>
+        <dl class="stats"><div><dt>Salary</dt><dd>${esc(pay(j))}</dd></div><div><dt>Location</dt><dd>${esc(shortWhere(j))}</dd></div><div><dt>Type</dt><dd>${esc(j.type || '—')}</dd></div><div><dt>Deadline</dt><dd>${esc(dl)}</dd></div></dl>
+        <a class="mini" href="#/job/${encodeURIComponent(j.id)}">${logo(j)}<span><small>View details</small><b>${esc(j.title)}</b></span>${icon('right')}</a>
+        <div class="actions">${apply}
+          <button class="btn glass" data-action="save" data-id="${esc(j.id)}" aria-pressed="${saved}">${icon('bookmark', saved ? 'fill' : '')} ${saved ? 'Saved' : 'Save'}</button>
+          <button class="btn glass" data-action="dismiss" data-id="${esc(j.id)}">${icon('x')} Not interested</button></div>
         <p class="why">${esc(why.length ? 'Why it’s here: ' + why[0].replace(/^./, (c) => c.toLowerCase()) + '.' : j.summary || 'Shown because nothing ranks higher right now.')}</p>
-        <div class="explain"><b>Match explanation</b><ul>${(why.length ? why : ['No confirmed matches yet — add details to your profile']).map((r) => `<li>${esc(r)}</li>`).join('')}${ev.unknown.length ? `<li>Still to verify: ${esc(ev.unknown[0])}</li>` : ''}${ev.gaps.length ? `<li>Possible gap: ${esc(ev.gaps[0])}</li>` : ''}</ul></div>
-        <div class="actions">${apply}<a class="btn" href="#/job/${encodeURIComponent(j.id)}">Details</a>${jobButtons(j)}</div>
+        <div class="explain"><b>${KJ.LEVEL_LABEL[ev.level]} — match explanation</b><ul>${(why.length ? why : ['No confirmed matches yet — add details to your profile']).map((r) => `<li>${esc(r)}</li>`).join('')}${ev.unknown.length ? `<li>Still to verify: ${esc(ev.unknown[0])}</li>` : ''}${ev.gaps.length ? `<li>Possible gap: ${esc(ev.gaps[0])}</li>` : ''}</ul></div>
       </div>
-      <div class="visual">${visual}</div>
+      <div class="visual">${art(j, 'big')}</div>
     </article>`;
   }
 
@@ -504,6 +516,7 @@
     const A = {
       save: () => setSaved(id), dismiss: () => dismiss(id), 'dismiss-detail': () => dismiss(id, true),
       restore: () => { delete state.dismissed[id]; persist(); render(true); toast('Restored to your feed.'); },
+      more: () => { session.cat = t.dataset.cat; session.q = ''; location.hash = '#/discover'; render(); window.scrollTo(0, 0); },
       cat: () => { session.cat = t.dataset.cat; session.q = ''; render(); }, 'clear-search': () => { session.q = ''; render(); },
       rail: () => { const r = document.getElementById(t.dataset.target); r.scrollBy({ left: Number(t.dataset.dir) * r.clientWidth * 0.85, behavior: 'smooth' }); },
       back: () => (history.length > 1 ? history.back() : (location.hash = '#/discover')),
