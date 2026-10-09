@@ -55,7 +55,7 @@ function mapPosting(p, feed) {
   return { externalId: `${feed.name}:${typeof id === 'object' ? JSON.stringify(id) : id}`, title: p.title, employer: org.name || feed.name, logoUrl: typeof org.logo === 'string' ? org.logo : org.logo && org.logo.url,
     locationText: [city, addr.addressRegion].filter(Boolean).join(', '), city, state: addr.addressRegion || null, remote: /TELECOMMUTE/i.test(p.jobLocationType || '') ? true : undefined,
     salaryMin: sal && (sal.minValue ?? sal.value), salaryMax: sal && (sal.maxValue ?? sal.value), salaryPeriod: period, type, published: p.datePosted, deadline: p.validThrough,
-    description: htmlToText(p.description), applyUrl: p.url || feed.url, canonicalUrl: p.url };
+    description: htmlToText(p.description), applyUrl: p.url || feed.url, canonicalUrl: p.url, feedHost: new URL(feed.url).hostname };
 }
 
 module.exports = {

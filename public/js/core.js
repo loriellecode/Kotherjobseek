@@ -30,7 +30,8 @@
   A.job = (id) => A.S.jobs.find((j) => j.id === Number(id));
   A.where = (j) => (j.remote ? j.arrangement || 'Remote' : [j.neighborhood && j.neighborhood !== j.city ? j.neighborhood : '', j.city, j.state].filter(Boolean).join(', ') || j.locationText || 'Location not listed');
   A.shortWhere = (j) => (j.remote ? 'Remote' : j.neighborhood || j.city || j.locationText || 'Location not listed');
-  A.pay = (j) => KJ.salaryText(j) || 'Salary not listed';
+  A.pay = (j) => (KJ.salaryParts(j) || {}).main || 'Salary not listed';
+  A.payAlt = (j) => { const p = KJ.salaryParts(j); return p ? p.alt : ''; }; // the hourly (or yearly) equivalent
   A.PROVIDER_NAMES = { adzuna: 'Adzuna', usajobs: 'USAJOBS', feeds: 'Employer career page', import: 'Imported file' };
   A.providerName = (p) => A.PROVIDER_NAMES[p] || p;
 

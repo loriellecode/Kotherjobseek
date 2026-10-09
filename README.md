@@ -10,7 +10,7 @@ No build step. **There is no email anywhere in the app** (alerts are in-app and 
 npm install
 cp .env.example .env     # fill in the keys you have
 npm start                # http://localhost:3000 → create the account
-npm test                 # 70 tests (67 run, 3 live-provider checks skip without credentials)
+npm test                 # 73 tests run, 3 more live-provider checks skip without credentials
 ```
 
 ## Setup checklist (nothing is simulated — missing keys mean no listings)
@@ -48,6 +48,10 @@ an unclear credential, and a master's degree is **never** treated as a teaching 
   and geography **from real current listings only**, and include/exclude controls. Accepted résumé items trigger a broader search.
 * **Pipeline**: debounced task queue (stages persisted; interrupted tasks are re-queued after a restart), provider daily budgets,
   repeat-search suppression, dedupe, stale/expired handling, scheduler, in-app notifications with duplicate prevention, optional push.
+
+## Application-link safety and pay display
+* Every application link is checked **before it is stored or shown** (`server/linkSafety.js`): https on the provider's own official domain, the employer's own careers domain, or a `.gov`/`.edu` site is *trusted*; Adzuna links are labelled as redirects; anything else is a *caution* — the Apply button becomes "Review link, then open" and a dialog shows the host plus anti-scam advice. Links with embedded credentials, raw IP/local hosts, URL shorteners or non-web schemes are **blocked** (never stored). This reduces risk; **no website can be certified safe** (a reputation service such as Google Safe Browsing could be added).
+* Pay is shown both ways everywhere: posted figure first, then the equivalent (full-time = 2,080 h/yr), e.g. `$78,000–$92,000/yr · ≈ $37.50–$44.23/hr`.
 
 ## Verification status (honest)
 | Area | Status |

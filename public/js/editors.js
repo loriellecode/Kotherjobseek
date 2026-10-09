@@ -114,6 +114,12 @@
         <p class="form-error" role="alert" hidden></p><div class="foot">${A.S.apps[jobId] ? '<button type="button" class="btn danger" data-action="untrack" data-id="' + jobId + '">Stop tracking</button>' : ''}<button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn primary" type="submit">Save Changes</button></div></form>`);
     A.intRow = row;
   }
+  function linkConfirm(j) {
+    const L = j.link || { host: '', notes: [] };
+    A.openModal(`${head('Check this link before you open it', `${j.title} — ${j.employer}`)}<p>This job’s application link goes to <b>${esc(L.host || 'an unknown site')}</b>.</p><ul class="changes">${(L.notes || []).map((n) => `<li>${esc(n)}</li>`).join('')}</ul>
+      <p class="note">We can’t confirm this site is safe. Before you apply: make sure the address looks right, never pay a fee to apply, and don’t share a Social Security number or bank details in an application form. A real employer won’t ask for those up front.</p>
+      <div class="foot"><button class="btn" data-action="close-modal">Cancel</button><a class="btn primary" href="${esc(j.applyUrl)}" target="_blank" rel="noopener noreferrer" data-action="apply-opened" data-id="${j.id}">Open ${esc(L.host)} ${icon('ext')}</a></div>`);
+  }
   function reportModal(id) {
     const j = A.job(id);
     A.openModal(`${head('Report this listing', `${j.title} · ${j.employer}`)}<p class="note">The listing is hidden from your feed. Reports are stored with your account so you can undo them.</p><form data-form="report" data-id="${id}"><div class="field">${['The listing has expired or been filled', 'The salary or details are incorrect', 'The application link is broken', 'It isn’t a real job posting', 'Something else'].map((r, i) => `<label class="check"><input type="radio" name="reason" value="${esc(r)}" ${i === 0 ? 'checked' : ''}> ${r}</label>`).join('')}</div><p class="form-error" role="alert" hidden></p><div class="foot"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn primary" type="submit">Report and hide</button></div></form>`);
@@ -126,6 +132,6 @@
 
   A.editors = {
     open(sec) { if (sec === 'skills') return skillsEditor(); if (['education', 'experience', 'certs'].includes(sec)) return recordList(sec); return prefsForm(sec); },
-    recordForm, recordList, skillsEditor, prefsForm, collectPrefs, resumeReview, conflictDialog, proposalEdit, trackerModal, reportModal, deleteModal, KIND,
+    recordForm, recordList, skillsEditor, prefsForm, collectPrefs, resumeReview, linkConfirm, conflictDialog, proposalEdit, trackerModal, reportModal, deleteModal, KIND,
   };
 })();

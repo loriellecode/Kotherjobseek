@@ -131,7 +131,7 @@
       save: () => run(() => setSaved(id)), dismiss: () => run(() => dismiss(id)), 'dismiss-detail': () => run(() => dismiss(id, true)),
       restore: () => run(async () => { await A.api('DELETE', `/api/jobs/${id}/dismissed`); A.job(id).userState.dismissed = null; A.render(true); A.toast('Restored to your feed.'); }),
       'restore-report': () => run(async () => { await A.api('DELETE', `/api/jobs/${id}/report`); A.job(id).userState.reported = null; A.render(true); A.toast('Report withdrawn.'); }),
-      'mark-applied': () => run(() => markApplied(id)), track: () => A.editors.trackerModal(Number(id)), report: () => A.editors.reportModal(Number(id)),
+      'mark-applied': () => run(() => markApplied(id)), 'open-link': () => A.editors.linkConfirm(A.job(id)), track: () => A.editors.trackerModal(Number(id)), report: () => A.editors.reportModal(Number(id)),
       cat: () => { ses.cat = t.dataset.cat; ses.q = ''; A.render(); }, more: () => { ses.cat = t.dataset.cat; ses.q = ''; if (route().r !== 'discover') location.hash = '#/discover'; A.render(); window.scrollTo(0, 0); },
       'clear-search': () => { ses.q = ''; A.render(); }, rail: () => { const r = document.getElementById(t.dataset.target); r.scrollBy({ left: Number(t.dataset.dir) * r.clientWidth * 0.85, behavior: 'smooth' }); },
       back: () => (history.length > 1 ? history.back() : (location.hash = '#/discover')),

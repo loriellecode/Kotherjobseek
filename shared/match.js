@@ -47,6 +47,20 @@
     return job.salaryEstimated ? `${range} (estimated)` : range;
   }
 
+  /* Pay in both forms: the posted figure first, then the equivalent (full-time = 2,080 hours a year). */
+  function salaryParts(job) {
+    const lo = num(job.salaryMin), hi = num(job.salaryMax);
+    if (lo === null && hi === null) return null;
+    const per = job.salaryPeriod || 'year', a = annual(lo, hi, per), est = job.salaryEstimated ? ' (estimated)' : '';
+    const money = (n, cents) => '$' + (cents ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(n).toLocaleString('en-US'));
+    const range = (x, y, cents) => (x !== y ? `${money(x, cents)}–${money(y, cents)}` : money(x, cents));
+    const hourly = { min: a.min / 2080, max: a.max / 2080 };
+    const l = lo ?? hi, h = hi ?? lo;
+    const main = per === 'hour' ? `${range(l, h, l % 1 !== 0 || h % 1 !== 0)}/hr` : salaryText(job).replace(' (estimated)', '');
+    const alt = per === 'hour' ? `≈ ${range(a.min, a.max, false)}/yr full-time` : `≈ ${range(hourly.min, hourly.max, true)}/hr`;
+    return { main: main + est, alt: alt + est, hourlyMin: hourly.min, hourlyMax: hourly.max };
+  }
+
   /* ---------- location ---------- */
   const stripPlace = (s) => norm(s).replace(/\b(ca|california|usa|us|united states)\b/g, '').replace(/\s+/g, ' ').trim();
   const cityOnly = (s) => stripPlace(s).replace(/\b(north|south|east|west|central|downtown|greater)\b/g, '').replace(/\s+/g, ' ').trim();
@@ -267,6 +281,6 @@
     ];
   }
 
-  Object.assign(KJ, { EDU_RANK, EDU_LABEL, CATEGORIES, CLASS_LABEL, CLASS_SHORT, CLASS_BARS, FIELD_WORDS, norm, num, tokens, fmtMoney, annual, profileFloor, profileDesired, salaryText, coordsFor, miles, evaluate, evalLocation, evalSalary, buildFeed, categoryFeed, search, chips, completion, isNearby, cityOnly, stripPlace });
+  Object.assign(KJ, { EDU_RANK, EDU_LABEL, CATEGORIES, CLASS_LABEL, CLASS_SHORT, CLASS_BARS, FIELD_WORDS, norm, num, tokens, fmtMoney, annual, profileFloor, profileDesired, salaryText, salaryParts, coordsFor, miles, evaluate, evalLocation, evalSalary, buildFeed, categoryFeed, search, chips, completion, isNearby, cityOnly, stripPlace });
   if (typeof module !== 'undefined') module.exports = KJ;
 })(typeof window !== 'undefined' ? window : globalThis);

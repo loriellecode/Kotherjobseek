@@ -3,6 +3,7 @@
  * Requirements detected from free text are flagged `inferred` so the UI can say so. */
 const crypto = require('node:crypto');
 const KJ = require('../shared/match');
+const { classify: classifyLink } = require('./linkSafety');
 
 const str = (v, max) => { const s = v === undefined || v === null ? '' : String(v).trim(); return max ? s.slice(0, max) : s; };
 const numOrNull = (v) => (v === null || v === undefined || v === '' || isNaN(Number(v)) ? null : Number(v));
@@ -86,7 +87,8 @@ function normalizeListing(raw, provider, now) {
   const education = raw.education || (ext.education ? { level: ext.education.level, preferred: ext.education.preferred, inferred: true } : null);
   const experience = raw.experience || (ext.experience ? ext.experience : null);
   const certs = raw.certs && raw.certs.length ? raw.certs : ext.certs;
-  const applyUrl = /^https?:\/\//i.test(str(raw.applyUrl)) ? str(raw.applyUrl, 2000) : null;
+  const link = str(raw.applyUrl) ? classifyLink(str(raw.applyUrl, 2000), provider, { feedHost: raw.feedHost }) : { url: null, level: null, host: '', notes: [] };
+  const applyUrl = link.url; // blocked links are never stored or shown
   const city = str(raw.city, 100) || null;
   return {
     provider, external_id: externalId, fingerprint: fingerprint(title, employer, city || locationText, remote), url_key: applyUrl ? normalizeUrl(raw.canonicalUrl || applyUrl) : null,
@@ -98,7 +100,7 @@ function normalizeListing(raw, provider, now) {
     required: JSON.stringify((raw.required || []).map((x) => str(x, 200)).filter(Boolean)), preferred: JSON.stringify((raw.preferred || []).map((x) => str(x, 200)).filter(Boolean)),
     edu_level: education ? education.level : null, edu_inferred: education ? (education.inferred ? 1 : 0) : 0, exp_years: experience ? experience.years : null, exp_field: experience ? experience.field || null : null, exp_inferred: experience ? (experience.inferred ? 1 : 0) : 0,
     certs: JSON.stringify(certs || []), categories: JSON.stringify(raw.categories && raw.categories.length ? raw.categories : deriveCategories(title, description + ' ' + (raw.categoryHint || ''))),
-    apply_url: applyUrl, logo_url: /^https:\/\//i.test(str(raw.logoUrl)) ? str(raw.logoUrl, 1000) : null, published: isoDate(raw.published), deadline: isoDate(raw.deadline),
+    apply_url: applyUrl, link_level: link.level, link_notes: JSON.stringify({ host: link.host, notes: link.notes }), logo_url: /^https:\/\//i.test(str(raw.logoUrl)) ? str(raw.logoUrl, 1000) : null, published: isoDate(raw.published), deadline: isoDate(raw.deadline),
     retrieved_at: now, raw_hash: crypto.createHash('sha1').update(JSON.stringify([title, employer, raw.salaryMin, raw.salaryMax, raw.deadline, description.slice(0, 500)])).digest('hex'),
     edu_preferred: education && education.preferred ? 1 : 0, exp_preferred: experience && experience.preferred ? 1 : 0,
   };

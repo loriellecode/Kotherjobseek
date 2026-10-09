@@ -41,22 +41,31 @@
     return `<article class="card ${variant || ''}" data-job="${j.id}"><a class="open" href="#/job/${j.id}" aria-label="${esc(j.title)}, ${esc(j.employer)}"></a>
       ${variant === 'compact' ? '' : `<div class="artwrap">${art(j)}${tags(j)}</div>`}
       <div class="employer">${esc(j.employer)}${variant === 'compact' ? ' ' + (isNew(j) ? '<span class="badge-new">New</span>' : '') + stale(j) : ''}</div>
-      <h3>${esc(j.title)}</h3><div class="meta">${esc(A.shortWhere(j))}${j.type ? ' · ' + esc(j.type) : ''}</div><div class="pay">${esc(A.pay(j))}</div>
+      <h3>${esc(j.title)}</h3><div class="meta">${esc(A.shortWhere(j))}${j.type ? ' · ' + esc(j.type) : ''}</div><div class="pay">${esc(A.pay(j))}${A.payAlt(j) ? `<span class="pay-alt">${esc(A.payAlt(j))}</span>` : ''}</div>
       ${blurb ? `<p class="blurb">${esc(blurb)}</p>` : ''}<div>${matchBadge(m)}</div>
       <div class="foot"><button class="pill" data-action="more" data-cat="${esc(more)}">More in ${esc(more)}</button><span class="grow"></span>${jobButtons(j)}</div></article>`;
   }
-  function applyButton(j, big) {
-    if (!j.applyUrl) return `<span class="btn primary" aria-disabled="true">No application link in this listing</span>`;
-    return `<a class="btn primary" href="${esc(j.applyUrl)}" target="_blank" rel="noopener noreferrer" data-action="apply-opened" data-id="${j.id}">Apply on employer site ${icon('ext')}</a>`;
+  /* Links are classified on the server (see server/linkSafety.js). Unrecognized sites require an explicit review step before opening. */
+  function applyButton(j) {
+    if (!j.applyUrl) return `<span class="btn primary" aria-disabled="true">${j.link && j.link.level === 'blocked' ? 'Link withheld for your safety' : 'No application link in this listing'}</span>`;
+    if (!j.link || j.link.level === 'caution') return `<button class="btn caution" data-action="open-link" data-id="${j.id}">Review link, then open ${icon('ext')}</button>`;
+    return `<a class="btn primary" href="${esc(j.applyUrl)}" target="_blank" rel="noopener noreferrer" data-action="apply-opened" data-id="${j.id}">Apply on ${j.link.level === 'redirect' ? 'Adzuna (forwards to employer)' : 'employer site'} ${icon('ext')}</a>`;
+  }
+  function linkNote(j) {
+    const L = j.link || {}; if (!L.level) return '';
+    const ic = { trusted: 'check', redirect: 'check', caution: 'alert', blocked: 'alert' }[L.level];
+    const head = { trusted: `Opens ${L.host}`, redirect: `Opens ${L.host}`, caution: `Unrecognized site: ${L.host}`, blocked: 'No application link shown' }[L.level];
+    return `<p class="linknote ${L.level}">${icon(ic)}<span><b>${esc(head)}.</b> ${esc((L.notes || []).join(' '))}${L.level === 'blocked' ? ' Search for this job on the employer’s own website instead.' : ''}</span></p>`;
   }
   function featuredCard(j, label) {
     const m = j.match, why = m.reasons.slice(0, 3), saved = !!j.userState.saved;
     return `<article class="featured" data-open="${j.id}"><div class="body">
       <div class="eyebrow-line">${esc(label || 'Featured')} · ${KJ.CLASS_SHORT[m.classification]} ${isNew(j) ? '<span class="badge-new">New</span>' : ''} ${stale(j)}</div>
       <h2><a href="#/job/${j.id}" style="text-decoration:none">${esc(j.title)}</a></h2><div class="employer">${esc(j.employer)}</div>
-      <dl class="stats"><div><dt>Salary</dt><dd>${esc(A.pay(j))}</dd></div><div><dt>Location</dt><dd>${esc(A.shortWhere(j))}</dd></div><div><dt>Type</dt><dd>${esc(j.type || 'Not listed')}</dd></div><div><dt>Deadline</dt><dd>${j.deadline ? esc(A.fmtDate(j.deadline)) : 'Not listed'}</dd></div></dl>
+      <dl class="stats"><div><dt>Salary</dt><dd>${esc(A.pay(j))}${A.payAlt(j) ? `<span class="pay-alt">${esc(A.payAlt(j))}</span>` : ''}</dd></div><div><dt>Location</dt><dd>${esc(A.shortWhere(j))}</dd></div><div><dt>Type</dt><dd>${esc(j.type || 'Not listed')}</dd></div><div><dt>Deadline</dt><dd>${j.deadline ? esc(A.fmtDate(j.deadline)) : 'Not listed'}</dd></div></dl>
       <a class="mini" href="#/job/${j.id}">${logo(j)}<span><small>View details</small><b>${esc(j.title)}</b></span>${icon('right')}</a>
       <div class="actions">${applyButton(j)}<button class="btn glass" data-action="save" data-id="${j.id}" aria-pressed="${saved}">${icon('bookmark', saved ? 'fill' : '')} ${saved ? 'Saved' : 'Save'}</button><button class="btn glass" data-action="dismiss" data-id="${j.id}">${icon('x')} Not interested</button></div>
+      ${linkNote(j)}
       <div class="explain"><b>Why it’s here</b><ul>${(why.length ? why : ['No confirmed alignment yet — add details to your profile']).map((r) => `<li>${esc(r)}</li>`).join('')}${m.unknown[0] ? `<li>Still to verify: ${esc(m.unknown[0])}</li>` : ''}${m.gaps[0] ? `<li>Possible gap: ${esc(m.gaps[0])}</li>` : ''}</ul>
         <p class="mini-ind"><span>Salary: ${esc(m.salary.text)}</span><span>Location: ${esc(m.location.text)}</span></p></div>
       <p class="src">Source: ${esc(A.providerName(j.provider))}${j.lastVerified ? ' · last seen ' + esc(A.ago(j.lastVerified)) : ''}</p></div>
@@ -194,7 +203,7 @@
 
   /* ---------- saved / applications ---------- */
   function rowCard(j, extra, sub) {
-    return `<div class="rowcard">${logo(j)}<button class="main" data-open="${j.id}"><h3>${esc(j.title)}</h3><div class="sub">${esc(j.employer)} · ${esc(A.shortWhere(j))} · ${esc(A.pay(j))}</div>${sub || ''}${stale(j)}</button><div class="side">${extra}</div></div>`;
+    return `<div class="rowcard">${logo(j)}<button class="main" data-open="${j.id}"><h3>${esc(j.title)}</h3><div class="sub">${esc(j.employer)} · ${esc(A.shortWhere(j))} · ${esc(A.pay(j))}${A.payAlt(j) ? ' · ' + esc(A.payAlt(j)) : ''}</div>${sub || ''}${stale(j)}</button><div class="side">${extra}</div></div>`;
   }
   function vSaved() {
     const saved = S().jobs.filter((j) => j.userState.saved).sort((a, b) => b.userState.saved - a.userState.saved), dis = S().jobs.filter((j) => j.userState.dismissed);
@@ -235,8 +244,8 @@
     const inner = `<button class="back" data-action="back">${icon('left')} Back</button><article class="detail"><header>
       ${closed ? `<div class="banner warn" style="margin-top:0">${icon('alert')}<div class="grow"><b>${j.status === 'expired' ? 'The application deadline has passed.' : 'This listing may have closed.'}</b> Check the original posting before spending time on it.</div></div>` : ''}
       <div class="employer">${logo(j)}<span>${esc(j.employer)}</span> ${isNew(j) ? '<span class="badge-new">New</span>' : ''}</div><h1>${esc(j.title)}</h1>
-      <div class="facts"><span>${esc(A.where(j))}</span><span class="pay">${esc(A.pay(j))}</span><span>${esc(j.type || '')}</span></div></header>
-      <div class="side"><div class="panel"><div class="rail-actions">${applyButton(j)}
+      <div class="facts"><span>${esc(A.where(j))}</span><span class="pay">${esc(A.pay(j))}${A.payAlt(j) ? ` <span class="pay-alt inline">${esc(A.payAlt(j))}</span>` : ''}</span><span>${esc(j.type || '')}</span></div></header>
+      <div class="side"><div class="panel"><div class="rail-actions">${applyButton(j)}${linkNote(j)}
         ${ses().applyNote === j.id ? `<p class="note" role="status" style="color:var(--ink)">The employer’s site opened in a new tab. Nothing was submitted from here — once you’ve applied there yourself, tap “Mark as applied.”</p>` : ''}
         <button class="btn ${saved ? 'on' : ''}" data-action="save" data-id="${j.id}" aria-pressed="${saved}">${icon('bookmark', saved ? 'fill' : '')} ${saved ? 'Saved' : 'Save job'}</button>
         <button class="btn ${app && app.status !== 'interested' ? 'on' : ''}" data-action="${app && app.status !== 'interested' ? 'track' : 'mark-applied'}" data-id="${j.id}">${icon('check')} ${app && app.status !== 'interested' ? `${esc(APP_STATUS[app.status])} · update` : 'Mark as applied'}</button>
@@ -254,7 +263,7 @@
           <h3>Potential gaps</h3>${m.gaps.length ? list(m.gaps) : '<p class="note" style="margin:0">No unmet requirements found in the listing data.</p>'}
           <p class="note"><a href="#/profile">Update your profile</a> and this is re-evaluated automatically.</p></section>
         ${trackerPanel(j)}
-        <section class="panel"><h2>At a glance</h2><dl class="kv"><div><dt>Location</dt><dd>${esc(A.where(j))}</dd></div><div><dt>Work arrangement</dt><dd>${esc(j.arrangement || 'Not stated')}</dd></div><div><dt>Salary</dt><dd class="pay">${esc(A.pay(j))}</dd></div><div><dt>Compensation type</dt><dd>${esc(comp)}</dd></div><div><dt>Employment type</dt><dd>${esc(j.type || 'Not listed')}</dd></div><div><dt>Application deadline</dt><dd>${esc(deadline)}</dd></div></dl></section>
+        <section class="panel"><h2>At a glance</h2><dl class="kv"><div><dt>Location</dt><dd>${esc(A.where(j))}</dd></div><div><dt>Work arrangement</dt><dd>${esc(j.arrangement || 'Not stated')}</dd></div><div><dt>Salary</dt><dd class="pay">${esc(A.pay(j))}${A.payAlt(j) ? `<span class="pay-alt">${esc(A.payAlt(j))}</span>` : ''}</dd></div><div><dt>Compensation type</dt><dd>${esc(comp)}</dd></div><div><dt>Employment type</dt><dd>${esc(j.type || 'Not listed')}</dd></div><div><dt>Application deadline</dt><dd>${esc(deadline)}</dd></div></dl></section>
         <section class="panel"><h2>Listing details</h2><span class="label-tag">${j.provider === 'import' ? 'From your imported file' : 'Text provided by ' + esc(A.providerName(j.provider)) + ' — may be an excerpt'}</span>
           ${j.description ? `<p class="desc">${esc(j.description)}</p>` : '<p class="note">No description was provided. Open the original listing for details.</p>'}
           <h3>Required qualifications (as listed)</h3>${list(j.required)}<h3>Preferred qualifications (as listed)</h3>${list(j.preferred)}

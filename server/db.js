@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   arrangement TEXT, remote INTEGER DEFAULT 0, salary_min REAL, salary_max REAL, salary_period TEXT, salary_estimated INTEGER DEFAULT 0, comp_note TEXT,
   employment_type TEXT, description TEXT, summary TEXT, required TEXT DEFAULT '[]', preferred TEXT DEFAULT '[]',
   edu_level TEXT, edu_inferred INTEGER DEFAULT 0, edu_preferred INTEGER DEFAULT 0, exp_years REAL, exp_field TEXT, exp_inferred INTEGER DEFAULT 0, exp_preferred INTEGER DEFAULT 0, certs TEXT DEFAULT '[]', categories TEXT DEFAULT '[]',
-  apply_url TEXT, logo_url TEXT, published TEXT, deadline TEXT,
+  apply_url TEXT, link_level TEXT, link_notes TEXT, logo_url TEXT, published TEXT, deadline TEXT,
   retrieved_at INTEGER NOT NULL, first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL, last_verified INTEGER,
   status TEXT NOT NULL DEFAULT 'active', also_listed TEXT DEFAULT '[]', raw_hash TEXT,
   UNIQUE(provider, external_id));
@@ -50,6 +50,7 @@ function open(file) {
 /* Add columns introduced after a database was first created (SCHEMA only covers fresh databases). */
 function ensureColumn(db, table, col, def) { if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`); }
 function migrate(db) {
+  ensureColumn(db, 'jobs', 'link_level', 'TEXT'); ensureColumn(db, 'jobs', 'link_notes', 'TEXT');
   for (const [c, d] of [['status', "TEXT NOT NULL DEFAULT 'ready'"], ['error', 'TEXT'], ['insights', 'TEXT'], ['analyzed_at', 'INTEGER'], ['accepted_count', 'INTEGER NOT NULL DEFAULT 0'], ['rejected_count', 'INTEGER NOT NULL DEFAULT 0'], ['duplicate_count', 'INTEGER NOT NULL DEFAULT 0']]) ensureColumn(db, 'resumes', c, d);
   for (const [c, d] of [['origin', "TEXT NOT NULL DEFAULT 'stated'"], ['evidence', "TEXT NOT NULL DEFAULT '[]'"], ['grp', 'TEXT']]) ensureColumn(db, 'resume_proposals', c, d);
 }
