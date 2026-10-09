@@ -4,7 +4,7 @@ const { now, j, tx } = require('./db');
 const { HttpError } = require('./http');
 
 const EDU_LEVELS = ['high school', 'associate', 'bachelor', 'master', 'doctorate'];
-const CATEGORIES = require('../shared/match').CATEGORIES;
+const KJ = require('../shared/match'), CATEGORIES = KJ.CATEGORIES;
 const TYPES = ['Full-time', 'Part-time', 'Contract', 'Temporary'];
 const MODES = ['onsite', 'hybrid', 'remote'];
 const KINDS = { education: 'education', experience: 'experience', skill: 'skill', cert: 'cert' };

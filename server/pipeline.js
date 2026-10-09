@@ -6,6 +6,7 @@
  * "done" is written only after every step has actually finished. Failures keep all existing results. */
 const config = require('./config');
 const { now, j, tx } = require('./db');
+const KJ = require('../shared/match');
 const { getProfile } = require('./profile');
 const providers = require('./providers');
 const { planSearches } = require('./queries');
@@ -115,6 +116,7 @@ class Pipeline {
           let fresh = 0;
           for (const raw of res.listings) {
             const n = normalizeListing(raw, prov.id, now()); if (!n) continue;
+            if (!KJ.inSearchStates({ state: n.state, locationText: n.location_text, remote: n.remote })) { result.outsideStates = (result.outsideStates || 0) + 1; continue; }
             const r = upsertJob(this.db, n);
             if (r.created) { result.created++; fresh++; } else if (r.duplicate) result.duplicates++; else { result.updated++; if (r.changed.length) this.noteChange(userId, r.id, r.changed); }
           }

@@ -32,6 +32,9 @@ function strongIds(db, userId) {
     WHERE m.user_id=? AND m.classification='strong' AND jb.status='active' AND u.dismissed_at IS NULL ${showBelow ? '' : 'AND m.excluded=0'}`).all(userId).map((r) => r.job_id));
 }
 
+/* Only show listings that say something about the job and give a way to apply (a link, or an email address to apply by). */
+function hasInfoAndWayToApply(r) { return !!((r.description || r.summary) && String(r.description || r.summary).trim().length >= 40 && (r.apply_url || r.email_apply)); }
+
 /* The API feed: jobs + their match + the user's own state. */
 function feedFor(db, userId) {
   const t = now();
@@ -39,6 +42,6 @@ function feedFor(db, userId) {
     FROM jobs jb JOIN matches m ON m.job_id=jb.id AND m.user_id=? LEFT JOIN user_jobs u ON u.job_id=jb.id AND u.user_id=?
     WHERE jb.status != 'closed' OR u.saved_at IS NOT NULL OR jb.id IN (SELECT job_id FROM applications WHERE user_id=?)
     ORDER BY m.overall DESC LIMIT 2000`).all(userId, userId, userId);
-  return rows.map((r) => Object.assign(jobView(r, t), { match: j(r.m_detail, null), userState: { saved: r.saved_at || null, dismissed: r.dismissed_at || null, reported: r.reported || null, firstSurfaced: r.first_surfaced || null } }));
+  return rows.filter((r) => KJ.inSearchStates({ state: r.state, locationText: r.location_text, remote: !!r.remote }) && hasInfoAndWayToApply(r)).map((r) => Object.assign(jobView(r, t), { match: j(r.m_detail, null), userState: { saved: r.saved_at || null, dismissed: r.dismissed_at || null, reported: r.reported || null, firstSurfaced: r.first_surfaced || null } }));
 }
 module.exports = { rematchUser, strongIds, feedFor, latestResumeText };

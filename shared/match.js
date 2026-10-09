@@ -283,6 +283,27 @@
     ];
   }
 
-  Object.assign(KJ, { EDU_RANK, EDU_LABEL, CATEGORIES, CLASS_LABEL, CLASS_SHORT, CLASS_BARS, FIELD_WORDS, norm, num, tokens, fmtMoney, annual, profileFloor, profileDesired, salaryText, salaryParts, coordsFor, miles, evaluate, evalLocation, evalSalary, buildFeed, categoryFeed, search, chips, completion, isNearby, cityOnly, stripPlace });
+
+  /* ---- search states: only California listings are kept ---- */
+  const STATE_NAMES = { alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA', colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY' };
+  const STATE_CODES = new Set(Object.values(STATE_NAMES));
+  function stateCode(x) { const t = String(x || '').trim(); if (!t) return null; if (/^[A-Za-z]{2}$/.test(t) && STATE_CODES.has(t.toUpperCase())) return t.toUpperCase(); return STATE_NAMES[t.toLowerCase()] || null; }
+  /* The state a listing is in, or null when it doesn't say. */
+  function jobState(job) {
+    const direct = stateCode(job.state); if (direct) return direct;
+    const loc = String(job.locationText || '');
+    const m = loc.match(/,\s*([A-Za-z][A-Za-z ]+?)\s*(?:\d{5})?\s*(?:,|$)/g);
+    if (m) for (const part of m.reverse()) { const c = stateCode(part.replace(/[,\d]/g, '').trim()); if (c) return c; }
+    for (const [name, code] of Object.entries(STATE_NAMES)) if (new RegExp('\\b' + name + '\\b', 'i').test(loc)) return code;
+    return null;
+  }
+  /* California is the only search state — there is no setting to change it. */
+  function inSearchStates(job) {
+    const st = jobState(job);
+    if (st) return st === 'CA';
+    return !!job.remote; // no state named: keep only remote listings (checked again against the listing text below)
+  }
+
+  Object.assign(KJ, { stateCode, jobState, inSearchStates, EDU_RANK, EDU_LABEL, CATEGORIES, CLASS_LABEL, CLASS_SHORT, CLASS_BARS, FIELD_WORDS, norm, num, tokens, fmtMoney, annual, profileFloor, profileDesired, salaryText, salaryParts, coordsFor, miles, evaluate, evalLocation, evalSalary, buildFeed, categoryFeed, search, chips, completion, isNearby, cityOnly, stripPlace });
   if (typeof module !== 'undefined') module.exports = KJ;
 })(typeof window !== 'undefined' ? window : globalThis);

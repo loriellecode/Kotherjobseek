@@ -38,7 +38,7 @@ t.describe('initial education profile (unverified until reviewed)', () => {
   t.it('matching treats reported degrees as unconfirmed, never as a credential', async () => {
     env.mock.state.jobs = [adz(1, { title: 'Budget Analyst', description: "Prepare budgets. Bachelor's degree required." }),
       adz(2, { title: 'Special Education Teacher', description: "Teach students with disabilities. Bachelor's degree required. A valid California Education Specialist Instruction Credential is required." }),
-      adz(3, { title: 'Special Education Program Specialist', company: { display_name: 'Test District' }, description: "Master's degree required." })];
+      adz(3, { title: 'Special Education Program Specialist', company: { display_name: 'Test District' }, description: "Support special education programs across the district. Master's degree required." })];
     await env.pipeline.drain();
     const jobs = (await c.req('GET', '/api/feed')).data.jobs, by = (x) => jobs.find((j) => j.title === x);
     const ba = by('Budget Analyst').match;
