@@ -8,19 +8,20 @@ const CATEGORY_TITLES = {
   Finance: ['financial analyst', 'budget analyst', 'accountant', 'finance manager', 'banking'],
   Business: ['business analyst', 'operations manager', 'business administration', 'program manager'],
   Education: ['assistant principal', 'education program coordinator', 'school business manager', 'curriculum', 'education administrator'],
+  'Workforce Development': ['employment specialist', 'job developer', 'workforce development specialist', 'career counselor', 'case manager'],
+  Banking: ['personal banker', 'relationship banker', 'loan processor', 'branch operations'],
   'Special Education': ['special education teacher', 'education specialist', 'special education program', 'behavior specialist'],
 };
 
 function titleTerms(profile, careers) {
-  const out = [], seen = new Set();
-  const add = (t) => { const s = String(t || '').trim(); const k = KJ.norm(s); if (s && k.length > 2 && !seen.has(k)) { seen.add(k); out.push(s); } };
-  (profile.titles || []).forEach(add);
-  (profile.experience || []).slice(-4).reverse().forEach((e) => add(e.title));
-  ((careers && careers.searchTerms) || []).forEach(add); // adjacent careers supported by the profile (see careers.js)
-  const lists = (profile.categories || []).map((c) => CATEGORY_TITLES[c] || []);
-  for (let i = 0; lists.some((l) => i < l.length); i++) lists.forEach((l) => l[i] && add(l[i]));
-  // A bare degree field ("Finance") is a weak query, so it comes after real job titles.
-  (profile.education || []).forEach((e) => { const f = (e.field || '').trim(); if (f && e.status !== 'in progress' && f.split(/\s+/).length <= 3) add(f); });
+  const seen = new Set(), clean = (arr) => arr.filter((t) => { const s = String(t || '').trim(), k = KJ.norm(s); if (!s || k.length < 3 || seen.has(k)) return false; seen.add(k); return true; }).map((t) => String(t).trim());
+  const own = clean([...(profile.titles || []), ...(profile.experience || []).slice(-4).reverse().map((e) => e.title)]); // what she has asked for / actually done
+  const careerT = clean((careers && careers.searchTerms) || []); // adjacent careers her background supports
+  const lists = (profile.categories || []).map((c) => CATEGORY_TITLES[c] || []), catT = []; for (let i = 0; lists.some((l) => i < l.length); i++) lists.forEach((l) => l[i] && catT.push(l[i]));
+  const cats = clean(catT);
+  const fields = clean((profile.education || []).filter((e) => e.field && e.status !== 'in progress' && e.field.trim().split(/\s+/).length <= 3).map((e) => e.field)); // a bare degree field is a weak query, so it goes last
+  // Round-robin so no single source (work history vs. stated categories vs. career paths) crowds the others out of the capped plan.
+  const out = [], groups = [own, careerT, cats, fields]; for (let i = 0; groups.some((g) => i < g.length); i++) groups.forEach((g) => g[i] && out.push(g[i]));
   return out;
 }
 

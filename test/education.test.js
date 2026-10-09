@@ -38,7 +38,7 @@ t.describe('initial education profile (unverified until reviewed)', () => {
   t.it('matching treats reported degrees as unconfirmed, never as a credential', async () => {
     env.mock.state.jobs = [adz(1, { title: 'Budget Analyst', description: "Prepare budgets. Bachelor's degree required." }),
       adz(2, { title: 'Special Education Teacher', description: "Teach students with disabilities. Bachelor's degree required. A valid California Education Specialist Instruction Credential is required." }),
-      adz(3, { title: 'Program Specialist', company: { display_name: 'Test District' }, description: "Master's degree required." })];
+      adz(3, { title: 'Special Education Program Specialist', company: { display_name: 'Test District' }, description: "Master's degree required." })];
     await env.pipeline.drain();
     const jobs = (await c.req('GET', '/api/feed')).data.jobs, by = (x) => jobs.find((j) => j.title === x);
     const ba = by('Budget Analyst').match;
@@ -47,7 +47,7 @@ t.describe('initial education profile (unverified until reviewed)', () => {
     const sp = by('Special Education Teacher').match, cert = sp.qualification.checks.find((x) => x.kind === 'cert');
     assert.equal(cert.status, 'unknown'); assert.notEqual(cert.status, 'met'); assert.match(cert.note, /degree on its own doesn’t confirm a credential/);
     assert.notEqual(sp.classification, 'needs_more', 'unclear credential does not exclude the job'); assert.ok(sp.unknown.some((x) => /Credential/.test(x)));
-    assert.equal(by('Program Specialist').match.qualification.checks.find((x) => x.kind === 'education').status, 'reported', 'the reported master’s is unconfirmed');
+    assert.equal(by('Special Education Program Specialist').match.qualification.checks.find((x) => x.kind === 'education').status, 'reported', 'the reported master’s is unconfirmed');
   });
   t.it('hourly minimum: $28/hr hides lower-paying jobs; higher pay ranks higher', async () => {
     env.mock.state.jobs.push(adz(4, { title: 'Budget Aide', salary_min: 40000, salary_max: 50000 }), adz(5, { title: 'Budget Director', salary_min: 100000, salary_max: 120000 }));

@@ -13,7 +13,7 @@
   const EDU_RANK = { 'high school': 1, associate: 2, bachelor: 3, master: 4, doctorate: 5 };
   const EDU_LABEL = { 'high school': 'High school diploma', associate: 'Associate degree', bachelor: "Bachelor's degree", master: "Master's degree", doctorate: 'Doctorate' };
   const PERIOD_MULT = { year: 1, hour: 2080, month: 12, week: 52 };
-  const CATEGORIES = ['Finance', 'Business', 'Education', 'Special Education'];
+  const CATEGORIES = ['Finance', 'Business', 'Education', 'Special Education', 'Workforce Development', 'Banking'];
   const CLASS_LABEL = { strong: 'Strong match', potential: 'Potential match', needs_more: 'Additional qualifications may be needed' };
   const CLASS_SHORT = { strong: 'Strong match', potential: 'Potential match', needs_more: 'May need more qualifications' };
   const CLASS_BARS = { strong: 3, potential: 2, needs_more: 1 };
@@ -21,6 +21,8 @@
     Finance: ['finance', 'financial', 'accounting', 'accountant', 'budget', 'banking', 'bank', 'audit', 'treasury', 'fiscal', 'payroll', 'credit', 'loan', 'investment', 'controller'],
     Business: ['business', 'operations', 'administration', 'management', 'manager', 'analyst', 'coordinator', 'logistics', 'procurement', 'strategy'],
     Education: ['education', 'school', 'teacher', 'teaching', 'instruction', 'instructional', 'principal', 'district', 'curriculum', 'academic', 'college', 'student', 'counselor'],
+    'Workforce Development': ['workforce', 'employment specialist', 'job developer', 'job placement', 'career counselor', 'career services', 'vocational', 'wioa', 'case manager', 'job coach', 'reentry', 'one stop', 'employment services', 'career technician', 'work experience'],
+    Banking: ['banking', 'bank', 'teller', 'credit union', 'loan', 'lending', 'relationship banker', 'personal banker', 'branch', 'member service'],
     'Special Education': ['special education', 'iep', 'resource specialist', 'behavior', 'autism', 'disabilities', 'mild moderate', 'moderate severe', 'education specialist'],
   };
   // Approximate city-centre coordinates (degrees) for commute estimates when a listing carries no coordinates.

@@ -4,11 +4,11 @@
  *  origin 'inferred' — a competency suggested by described responsibilities. Always labelled as a suggestion needing confirmation,
  *                      and always carries the sentence(s) it was inferred from. */
 const MONTHS = 'jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec';
-const RANGE = new RegExp(`((?:(?:${MONTHS})[a-z]*\\.?\\s+)?(?:19|20)\\d{2})\\s*(?:-|–|—|to)\\s*(present|current|now|(?:(?:${MONTHS})[a-z]*\\.?\\s+)?(?:19|20)\\d{2})`, 'i');
+const RANGE = new RegExp(`((?:(?:${MONTHS})[a-z]*\\.?\\s*|\\d{1,2}\\/)?(?:19|20)\\d{2})\\s*(?:-|–|—|to)\\s*(present|current|now|(?:(?:${MONTHS})[a-z]*\\.?\\s*|\\d{1,2}\\/)?(?:19|20)\\d{2})`, 'i');
 const SECTION = [
   ['education', /^(education|academic (background|history)|education and training|degrees?)$/i], ['experience', /^((professional|relevant|related|work|employment|career) )?(experience|history)( summary)?$|^employment$|^work experience$/i],
   ['skills', /^((technical|core|key|professional|relevant) )?(skills|competencies|proficiencies)( (and|&) (tools|software|technologies))?$|^(tools|software|technical proficiencies)$/i], ['certs', /^(certifications?|licenses?|credentials|certifications? (and|&) licenses?|licenses? (and|&) certifications?|professional (licenses|certifications|credentials))$/i],
-  ['summary', /^(professional )?(summary|profile|objective|career summary|summary of qualifications)$/i], ['other', /^(awards?|honors?|projects?|references?|volunteer( experience)?|publications?|affiliations?|interests?|activities|languages?)$/i],
+  ['summary', /^(professional )?(summary|profile|objective|career objective|career summary|summary of qualifications)$/i], ['other', /^(awards?|honors?|projects?|references?|volunteer( experience)?|publications?|affiliations?|interests?|activities|languages?)$/i],
 ];
 const TOOLS = ['Excel', 'Microsoft Word', 'PowerPoint', 'Outlook', 'Microsoft Office', 'Google Workspace', 'Google Sheets', 'QuickBooks', 'SAP', 'Oracle', 'NetSuite', 'Workday', 'PeopleSoft', 'Munis', 'Salesforce', 'SQL', 'Tableau', 'Power BI', 'Access', 'Blackbaud', 'Sage', 'Bloomberg', 'SEIS', 'Aeries', 'PowerSchool', 'Infinite Campus', 'Canvas', 'Google Classroom', 'Smartsheet', 'Asana', 'Visio', 'Adobe Acrobat', 'Zoom'];
 const DEG = [['doctorate', /\b(ph\.?\s?d\.?|doctor(?:ate)? of [a-z ]+|ed\.?\s?d\.?)\b/i], ['master', /\b(master(?:'s|’s)?(?: degree)?(?: of| in)?|m\.?b\.?a\.?|m\.?s\.?(?= |,|$)|m\.?a\.?(?= |,|$)|m\.?ed\.?)/i], ['bachelor', /\b(bachelor(?:'s|’s)?(?: degree)?(?: of| in)?|b\.?s\.?(?= |,|$)|b\.?a\.?(?= |,|$)|b\.?b\.?a\.?)/i], ['associate', /\b(associate(?:'s|’s)?(?: degree)?(?: of| in)?|a\.?a\.?(?= |,|$)|a\.?s\.?(?= |,|$))/i]];
@@ -20,25 +20,36 @@ const COMPETENCIES = [
   ['budgeting', 'Budgeting and forecasting', 'finance', /\b(budget(s|ing|ed)?|forecast(s|ing)?|variance|appropriation|expenditure|cost control|fiscal)\b/i],
   ['finreport', 'Financial reporting and analysis', 'finance', /\b(financial (analysis|reports?|reporting|statements?|models?|modeling)|reconcil\w+|general ledger|month[- ]end|audit\w*|journal entr\w+|profit and loss|p&l)\b/i],
   ['apar', 'Accounts payable / receivable', 'finance', /\b(accounts? (payable|receivable)|\bA\/?P\b|\bA\/?R\b|invoic\w+|billing|collections?)\b/i],
-  ['banking', 'Banking and lending', 'banking', /\b(bank(ing)?|teller|loan(s)?|lending|mortgage|credit union|underwrit\w+|branch|deposit(s)?)\b/i],
-  ['payroll', 'Payroll', 'finance', /\bpayroll\b/i],
-  ['supervision', 'Staff supervision and team leadership', 'management', /\b(supervis\w+|manag(ed|ing) (a )?(team|staff|employees|department|\d+)|led (a )?(team|staff|\d+)|lead(ing)? (a )?(team|staff)|direct(ed|ing) (a )?(team|staff)|oversaw|oversee(ing)?|hired|evaluat\w+ (staff|employees)|mentor\w*)\b/i],
-  ['admin', 'Office and administrative management', 'administration', /\b(office (manag\w+|administr\w+)|administrat(ive|ion|or)|schedul(e|ing)|calendar|records? (management|keeping)|front office|clerical|coordinat(ed|ing) (office|meetings|logistics))\b/i],
-  ['operations', 'Business operations', 'business', /\b(operations?|process improvement|workflow|logistics|procurement|purchasing|vendor(s)?|inventory|policies and procedures|compliance)\b/i],
-  ['projects', 'Project and program coordination', 'business', /\b(project(s)? (manag\w+|coordinat\w+|plan\w+)|program (coordinat\w+|manag\w+|develop\w+)|coordinat(ed|ing) (programs?|projects?|events?)|grant(s)?\b|timeline(s)?)\b/i],
-  ['training', 'Training and staff development', 'education', /\b(train(ed|ing|er)s?|professional development|onboard\w*|workshop(s)?|curricul\w+|instruction(al)? (design|coach)\w*|staff development)\b/i],
-  ['teaching', 'Teaching and classroom instruction', 'education', /\b(taught|teach(ing)?|classroom|lesson plans?|instruct(ed|ing|ion)|students?)\b/i],
-  ['speced', 'Special education (IEPs, accommodations)', 'special education', /\b(special education|IEPs?|individualized education|resource specialist|inclusion|accommodations?|modif(ied|ications?)|students? with (disabilit\w+|special needs)|autism|behavior (plan|support|intervention)s?|case manage\w+)\b/i],
-  ['customer', 'Customer and client service', 'business', /\b(customer service|client(s)? (relations|service)|member service|front desk|help ?desk)\b/i],
-  ['data', 'Data analysis and reporting', 'business', /\b(data analy\w+|dashboards?|metrics|kpi(s)?|statistical|spreadsheets?|reporting)\b/i],
-  ['hr', 'Human resources support', 'administration', /\b(human resources|recruit\w+|benefits administration|employee relations|personnel)\b/i],
+  ['banking', 'Banking and lending', 'banking', /\b(bank(ing|er)?|teller|loan(s)?|lending|mortgage|credit union|underwrit\w+|deposit(s)?|western union)\b/i],
+  ['payroll', 'Payroll', 'finance', /\b(payroll|timesheets?|wages)\b/i],
+  ['supervision', 'Staff supervision and team leadership', 'management', /\b(supervis\w+|manag(ed|ing) (a )?(team|staff|employees|department|\d+)|led (a )?(team|staff|\d+)|lead(ing)? (a )?(team|staff)|lead and participate|direct(ed|ing) (a )?(team|staff)|oversaw|oversee(ing)?|assign (employee )?duties|work guidance to assigned|review work for compliance|evaluat\w+ (staff|employees)|mentor\w*)\b/i],
+  ['admin', 'Office and administrative management', 'administration', /\b(office (manag\w+|administr\w+)|administrative (support|assistant|duties)|administrat(ive|ion|or)|schedul(e|ing)|calendar|records? (management|keeping)|front office|clerical|meeting minutes|file systems?|answer(ing)? (the )?phones?)\b/i],
+  ['operations', 'Business operations', 'business', /\b(operations?|process improvement|workflow|logistics|procurement|purchasing|vendor(s)?|inventory|policies and procedures|compliance|comply with)\b/i],
+  ['projects', 'Project and program coordination', 'business', /\b(project(s)? (manag\w+|coordinat\w+|plan\w+)|program (coordinat\w+|manag\w+|develop\w+|activities|expectations)|coordinat(ed|ing) (programs?|projects?|events?|applicant|client)|implementing (youth services )?(projects|operations)|timeline(s)?)\b/i],
+  ['training', 'Training and staff development', 'education', /\b(train(ed|ing|er)s?|professional development|onboard\w*|workshop(s)?|curricul\w+|instruction(al)? (design|coach)\w*|staff development|lesson planning|soft skills)\b/i],
+  ['teaching', 'Teaching and instruction', 'education', /\b(taught|teach(ing)?|lesson plans?|classroom|instruct(ed|ing|ion)|designed and taught|delivers? work ?ability)\b/i],
+  ['speced', 'Special education support (IEPs, transition services)', 'special education', /\b(special education|IEPs?|individualized education|resource specialist|inclusion|students? with (disabilit\w+|special needs)|individuals? with (disabilit\w+|special needs)|special needs|autism|behavior (plan|support|intervention)s?|transition (services|to competitive)|work ?ability)\b/i],
+  ['casemgmt', 'Case management', 'workforce', /\b(case[- ]manage\w*|caseload|intake|individual(ized)? (employment|employability|service|education|program) (plans?|strateg\w+)|eligibility|barrier(s)? (reduction|to employment)|participant (files|records)|referr?(ed|al)s?)\b/i],
+  ['jobdev', 'Job development and employer outreach', 'workforce', /\b(job develop\w*|employer(s)? (outreach|partnerships?|relationships?)|relationships? with (a variety of )?(local area )?employers|placement|job coaching|internships?|work[- ]based|work ?sites?|developing (job|employment)|job opportunities|supported employment)\b/i],
+  ['careerguid', 'Career counseling and vocational assessment', 'workforce', /\b(career (guidance|counsel\w+|plans?|services)|vocational (assessment|rehabilitation|guidance|training)|WIOA|assessment instruments?|job readiness|academic counseling|employability|interview(ing)? skills|resume (assistance|writing))\b/i],
+  ['grants', 'Grant writing and funding compliance', 'business', /\b(grant (proposals?|specifications?|requirements?|writing|compliance)|funding proposals?|fundrais\w+|donors?|sponsors?)\b/i],
+  ['recruiting', 'Recruiting and candidate screening', 'administration', /\b(recruit\w+|candidate sourcing|sourcing|screen(ing|s|ed)? (potential |applicants|participants|candidates)|hiring)\b/i],
+  ['customer', 'Customer and client service', 'business', /\b(customer service|client(s)? (relations|service)|member service|front desk|help ?desk|customer relationships?)\b/i],
+  ['data', 'Data entry, records and reporting', 'business', /\b(data analy\w+|data entry|database|dashboards?|metrics|kpi(s)?|statistical|spreadsheets?|reports? (and|on)|service tracking reports|documentation)\b/i],
+  ['hr', 'Human resources support', 'administration', /\b(human resources|benefits administration|employee relations|hr department)\b/i],
 ];
 const INDUSTRIES = [
   ['Public education (K–12 / higher education)', /\b(school district|unified school|usd|elementary|middle school|high school|college|university|academy|charter school|county office of education)\b/i], ['Banking / credit unions', /\b(bank|credit union|savings|financial institution|mortgage)\b/i],
   ['Local / state government', /\b(county of|city of|state of|county office|department of|municipal|public works)\b/i], ['Healthcare', /\b(hospital|clinic|health|medical|healthcare)\b/i], ['Nonprofit / social services', /\b(foundation|nonprofit|non-profit|community services|regional center|united way)\b/i],
 ];
 
-const clean = (s) => String(s || '').replace(/ /g, ' ').replace(/[ \t]+/g, ' ').trim();
+/* Some résumé templates repeat a heading several times in the extracted text ("JOB DEVELOPERJOB DEVELOPER..."): collapse it. */
+function dedupeRepeat(l) {
+  const n = l.length; if (n < 8) return l;
+  for (let p = 4; p <= n / 2; p++) if (n % p === 0 && l === l.slice(0, p).repeat(n / p)) return l.slice(0, p);
+  return l;
+}
+const clean = (s) => dedupeRepeat(String(s || '').replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').trim());
 const bullet = (s) => clean(s).replace(/^[•●▪■◦*·\-–—]+\s*/, '');
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -57,8 +68,8 @@ function sections(lines) {
 }
 function parseDate(s, isEnd) {
   if (/present|current|now/i.test(s)) return { y: new Date().getFullYear(), m: new Date().getMonth() + 1, present: true };
-  const y = Number((s.match(/(19|20)\d{2}/) || [])[0]), mm = (s.match(new RegExp(`(${MONTHS})`, 'i')) || [])[1];
-  const m = mm ? 1 + MONTHS.split('|').findIndex((x) => x.startsWith(mm.toLowerCase().slice(0, 3))) : (isEnd ? 12 : 1);
+  const y = Number((s.match(/(19|20)\d{2}/) || [])[0]), mm = (s.match(new RegExp(`(${MONTHS})`, 'i')) || [])[1], nm = (s.match(/^\s*(\d{1,2})\//) || [])[1];
+  const m = nm ? Number(nm) : mm ? 1 + MONTHS.split('|').findIndex((x) => x.startsWith(mm.toLowerCase().slice(0, 3))) : (isEnd ? 12 : 1);
   return { y, m: Math.max(1, Math.min(12, m)) };
 }
 const yearsBetween = (a, b) => Math.max(0, Math.round((((b.y - a.y) * 12 + (b.m - a.m) + 1) / 12) * 2) / 2);
@@ -70,11 +81,15 @@ function parseExperience(lines) {
     const l = lines[i]; if (!l) continue; const m = l.match(RANGE);
     if (m && l.length < 160) {
       flush();
-      const head = clean(l.replace(RANGE, '').replace(/[()|,–—-]+\s*$/g, '').replace(/^\s*[|,–—-]+/, ''));
+      let head = clean(l.replace(RANGE, '').replace(/[()|,–—-]+\s*$/g, '').replace(/^\s*[|,–—-]+/, ''));
+      if (!head) { // "date first, title on the next line" layout
+        let k = i + 1; while (k < lines.length && !lines[k]) k++;
+        if (k < lines.length && !/^[•●▪■◦*·\-–—]/.test(lines[k]) && lines[k].length < 100 && !RANGE.test(lines[k])) { head = lines[k]; i = k; }
+      }
       let parts = head.split(/\s*\|\s*|\s+[–—-]\s+|\s+@\s+|\s+at\s+|,\s+/).map(clean).filter(Boolean);
       if (parts.length < 2) { const before = prev.filter((x) => !/^[•●▪■◦*·\-–—]/.test(x)).slice(-2); parts = [...before, ...parts].filter(Boolean); if (parts.length > 2) parts = parts.slice(-2); }
       const a = parseDate(m[1], false), b = parseDate(m[2], true);
-      cur = { title: parts[0] || '', employer: parts[1] || '', start: `${a.y}${m[1].match(new RegExp(MONTHS, 'i')) ? '-' + String(a.m).padStart(2, '0') : ''}`, end: b.present ? '' : `${b.y}${m[2].match(new RegExp(MONTHS, 'i')) ? '-' + String(b.m).padStart(2, '0') : ''}`, years: yearsBetween(a, b), bullets: [], raw: l };
+      cur = { title: parts[0] || '', employer: parts[1] || '', start: `${a.y}${/[a-z]|^\s*\d{1,2}\//i.test(m[1]) ? '-' + String(a.m).padStart(2, '0') : ''}`, end: b.present ? '' : `${b.y}${/[a-z]|^\s*\d{1,2}\//i.test(m[2]) ? '-' + String(b.m).padStart(2, '0') : ''}`, years: yearsBetween(a, b), bullets: [], raw: l };
       prev = []; continue;
     }
     if (cur) { if (/^[•●▪■◦*·\-–—]/.test(l) || l.length > 40) cur.bullets.push(bullet(l)); else if (!cur.employer && l.length < 80) cur.employer = l; else cur.bullets.push(bullet(l)); }
@@ -111,7 +126,7 @@ function analyze(text) {
   for (const e of parseEducation(eduLines, lines)) push('education', { level: e.level, field: e.field, title: e.title, school: e.school, status: e.status, year: e.year, flag: e.level && !e.field ? 'Field of study was not clear in the résumé line.' : '' }, 'stated', [e.line], 'education');
 
   // experience
-  const expSection = get('experience'), entries = parseExperience(expSection.length ? expSection : lines);
+  const expSection = get('experience'); let entries = parseExperience(expSection); if (!entries.length) entries = parseExperience(lines); // some templates scatter entry headers outside the experience section
   const tagsByEntry = [];
   for (const e of entries) {
     const text = e.bullets.join('. '), tags = new Set(), ev = {};

@@ -15,22 +15,24 @@ const LABEL = Object.fromEntries(COMPETENCIES.map(([id, label]) => [id, label]))
 const has = (hay, needle) => KJ.norm(hay).includes(KJ.norm(needle));
 
 function evidenceFor(o, p) {
-  const ev = [], types = new Set(); let score = 0, expTagEntries = 0, direct = false;
+  const ev = [], types = new Set(); let score = 0, expTagEntries = 0, direct = false, core = false;
   const add = (type, w, text) => { ev.push({ type, text }); types.add(type); score += w; };
   for (const e of p.experience || []) {
     const hit = (e.tags || []).filter((t) => o.tags.includes(t));
-    if (hit.length) { expTagEntries++; add('work', 2 + Math.min(2, hit.length - 1), `Work history — ${e.title}${e.employer ? ', ' + e.employer : ''}: responsibilities include ${hit.map((t) => LABEL[t] || t).join(', ').toLowerCase()}${e.verified === false ? ' (not yet confirmed)' : ''}`); }
-    if (o.titles.some((t) => has(e.title, t))) add('title', 3, `Job title — you worked as ${e.title}${e.employer ? ' at ' + e.employer : ''}`);
+    if (hit.some((t) => o.core.includes(t))) core = true;
+    const coreHit = hit.some((t) => o.core.includes(t)); // generic duties (projects, admin, training…) count only a little; defining competencies count fully
+    if (hit.length) { if (coreHit) expTagEntries++; add('work', coreHit ? 2 + Math.min(2, hit.length - 1) : 0.5, `Work history — ${e.title}${e.employer ? ', ' + e.employer : ''}: responsibilities include ${hit.map((t) => LABEL[t] || t).join(', ').toLowerCase()}${e.verified === false ? ' (not yet confirmed)' : ''}`); }
+    if (o.titles.some((t) => has(e.title, t))) { core = true; add('title', 3, `Job title — you worked as ${e.title}${e.employer ? ' at ' + e.employer : ''}`); }
     if (o.industries.length && o.industries.some((i) => has(`${e.employer} ${(e.responsibilities || []).join(' ')}`, i))) add('industry', 1, `Industry — experience at ${e.employer}`);
   }
   for (const s of p.skills || []) {
-    if ((s.name && o.skills.some((k) => has(s.name, k))) || (o.edu.length && false)) add('skill', 2, `Skill — ${s.name}${s.origin === 'inferred' ? ' (suggested from your résumé and confirmed by you)' : ''}`);
+    if (s.name && o.skills.some((k) => has(s.name, k))) { core = true; add('skill', 2, `Skill — ${s.name}${s.origin === 'inferred' ? ' (suggested from your résumé and confirmed by you)' : ''}`); }
   }
   for (const e of p.education || []) {
     const txt = `${e.field} ${e.title}`;
     if (o.edu.some((k) => has(txt, k))) { direct = direct || o.eduDirect; add('education', e.verified === false ? 1.5 : 2, `Education — ${e.field || e.title}${e.level ? ' (' + KJ.EDU_LABEL[e.level].toLowerCase() + ')' : ''}, ${e.verified === false ? 'reported but not yet confirmed' : 'confirmed'}`); }
   }
-  const supported = types.size >= 2 || expTagEntries >= 2 || (direct && types.has('education'));
+  const supported = (core && (types.size >= 2 || expTagEntries >= 2)) || (direct && types.has('education')); // a defining competency is required
   return { ev, score, supported, types: [...types], direct };
 }
 

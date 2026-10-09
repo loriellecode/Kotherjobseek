@@ -49,8 +49,12 @@ function compare(db, userId, kind, d) {
     if (kind === 'skill') { if (norm(r.name) === norm(d.name)) return { duplicate: true, record: r }; continue; }
     if (kind === 'cert') { if (!(norm(r.name) === norm(d.name) || overlap(r.name, d.name) >= 0.8)) continue; if (r.status !== d.status) diffs.push(`status: profile says “${r.status}”, résumé says “${d.status}”`); }
     else if (kind === 'education') {
-      const sameField = (norm(r.field) && norm(r.field) === norm(d.field)) || (r.title && d.title && norm(r.title) === norm(d.title));
+      const sameLevel = r.level && d.level && r.level === d.level;
+      const sameField = (norm(r.field) && norm(r.field) === norm(d.field)) || (r.title && d.title && norm(r.title) === norm(d.title)) || (sameLevel && norm(r.field) && norm(d.field) && (overlap(r.field, d.field) >= 0.5 || overlap(d.field, r.field) >= 0.5));
       if (!sameField) continue;
+      if (norm(r.field) && norm(d.field) && norm(r.field) !== norm(d.field)) diffs.push(`field wording: profile says “${r.field}”, résumé says “${d.field}”`);
+      if (d.title && !r.title) diffs.push(`the résumé gives the exact degree title “${d.title}”`);
+      if (d.school && !r.school) diffs.push(`the résumé names the school “${d.school}”`);
       if (r.level && d.level && r.level !== d.level) diffs.push(`degree level: profile says ${r.level}, résumé says ${d.level}`);
       if (r.school && d.school && norm(r.school) !== norm(d.school)) diffs.push(`school: profile says “${r.school}”, résumé says “${d.school}”`);
       if (r.year && d.year && Number(r.year) !== Number(d.year)) diffs.push(`graduation year: profile says ${r.year}, résumé says ${d.year}`);
@@ -74,6 +78,7 @@ async function processResume(db, userId, id) {
     const buf = fs.readFileSync(path.join(dirFor(userId), r.stored_name)), text = await extractText(path.extname(r.stored_name), buf);
     if (norm(text).length < 40) throw Object.assign(new Error('No readable text was found. It may be a scanned image or a protected file. Upload a text-based PDF or Word file, or enter your information manually.'), { user: true });
     const a = analyze(text); let dups = 0;
+    a.insights.educationFound = a.proposals.filter((p) => p.kind === 'education').map((p) => ({ level: p.data.level, field: p.data.field, title: p.data.title }));
     tx(db, () => {
       const ins = db.prepare('INSERT INTO resume_proposals(user_id,resume_id,kind,data,origin,evidence,grp) VALUES(?,?,?,?,?,?,?)');
       for (const p of a.proposals) { const c = compare(db, userId, p.kind, p.data); if (c && c.duplicate) { dups++; continue; } ins.run(userId, id, p.kind, JSON.stringify(p.data), p.origin, JSON.stringify(p.evidence), p.group); }
@@ -106,7 +111,10 @@ function state(db, userId) {
   if (!r) return { resume: null, proposals: [] };
   const rows = db.prepare("SELECT * FROM resume_proposals WHERE resume_id=? AND user_id=? AND status='pending' ORDER BY id").all(r.id, userId);
   const proposals = rows.map((p) => { const data = j(p.data, {}), c = compare(db, userId, p.kind, data); return { id: p.id, kind: p.kind, group: p.grp || p.kind, origin: p.origin, evidence: j(p.evidence, []), data, conflict: c && c.conflict ? c.conflict : null }; });
-  return { resume: { id: r.id, filename: r.filename, size: r.size, uploadedAt: r.created_at, status: r.status, error: r.error, analyzedAt: r.analyzed_at, textAvailable: !!r.text, insights: j(r.insights, null), counts: { pending: proposals.length, accepted: r.accepted_count, rejected: r.rejected_count, duplicates: r.duplicate_count } }, proposals };
+  const ins = j(r.insights, null), found = (ins && ins.educationFound) || [];
+  /* Cross-check: education already in the profile (e.g. provided by family, unverified) that this résumé does not show. */
+  const notOnResume = r.status === 'ready' ? P.getProfile(db, userId).education.filter((e) => e.verified === false && e.status !== 'in progress' && !found.some((f) => (norm(f.field) && (norm(f.field) === norm(e.field) || overlap(e.field, f.field) >= 0.5 || overlap(f.field, e.field) >= 0.5)) && (!e.level || !f.level || e.level === f.level))).map((e) => ({ id: e.id, text: `${e.level ? e.level + "'s degree" : 'Degree'}${e.field ? ' — ' + e.field : ''}` })) : [];
+  return { resume: { id: r.id, notOnResume, filename: r.filename, size: r.size, uploadedAt: r.created_at, status: r.status, error: r.error, analyzedAt: r.analyzed_at, textAvailable: !!r.text, insights: j(r.insights, null), counts: { pending: proposals.length, accepted: r.accepted_count, rejected: r.rejected_count, duplicates: r.duplicate_count } }, proposals };
 }
 function removeResume(db, userId) {
   const rows = db.prepare('SELECT * FROM resumes WHERE user_id=?').all(userId); let deleted = 0;
