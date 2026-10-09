@@ -17,6 +17,7 @@ const careersEngine = require('./careers');
 const emailEngine = require('./emailEngine');
 const E = require('../shared/emailDoc').email;
 const { normalizeListing } = require('./normalize');
+const trustCheck = require('./trustCheck');
 const { upsertJob, jobView } = require('./jobs');
 
 const A_where = (j) => (j.remote ? 'Remote' : [j.city, j.state].filter(Boolean).join(', '));
@@ -141,6 +142,8 @@ function createApp(db, pipeline) {
   /* ---- jobs & per-user state ---- */
   route('GET', '/api/jobs/:id', (req, res, m) => { const id = jobId(m); const f = feedFor(db, req.user.id).find((x) => x.id === id); H.send(res, f ? 200 : 404, f || { error: 'Job not found' }); });
   const userJob = (userId, id) => db.prepare('INSERT OR IGNORE INTO user_jobs(user_id,job_id) VALUES(?,?)').run(userId, id);
+  const recheckLimit = H.rateLimiter(30, 60 * 60000);
+  route('POST', '/api/jobs/:id/recheck', async (req, res, m) => { const id = jobId(m); recheckLimit('u' + req.user.id); await trustCheck.recheck(db, id); const f = feedFor(db, req.user.id).find((x) => x.id === id); H.send(res, 200, f || { error: 'Job not found' }); });
   route('PUT', '/api/jobs/:id/saved', (req, res, m) => { const id = jobId(m); userJob(req.user.id, id); db.prepare('UPDATE user_jobs SET saved_at=? WHERE user_id=? AND job_id=?').run(now(), req.user.id, id); H.send(res, 200, { saved: true }); });
   route('DELETE', '/api/jobs/:id/saved', (req, res, m) => { const id = jobId(m); db.prepare('UPDATE user_jobs SET saved_at=NULL WHERE user_id=? AND job_id=?').run(req.user.id, id); H.send(res, 200, { saved: false }); });
   route('PUT', '/api/jobs/:id/dismissed', (req, res, m) => { const id = jobId(m); userJob(req.user.id, id); db.prepare('UPDATE user_jobs SET dismissed_at=?, saved_at=NULL WHERE user_id=? AND job_id=?').run(now(), req.user.id, id); H.send(res, 200, { dismissed: true }); });
@@ -195,7 +198,7 @@ function createApp(db, pipeline) {
     H.send(res, 201, { subscribed: true });
   });
   route('DELETE', '/api/push/subscribe', async (req, res) => { const b = await H.readJson(req).catch(() => ({})); if (b.endpoint) db.prepare('DELETE FROM push_subscriptions WHERE user_id=? AND endpoint=?').run(req.user.id, b.endpoint); else db.prepare('DELETE FROM push_subscriptions WHERE user_id=?').run(req.user.id); H.send(res, 200, { subscribed: false }); });
-  route('GET', '/api/imagery/:topic', async (req, res, m) => H.send(res, 200, await imagery.getImage(db, decodeURIComponent(m.topic))));
+  route('GET', '/api/imagery/:topic', async (req, res, m) => H.send(res, 200, await imagery.getImage(db, decodeURIComponent(m.topic), new URL(req.url, 'http://x').searchParams.get('i'))));
 
   /* ---- static files ---- */
   function serveStatic(req, res) {
@@ -231,6 +234,7 @@ function createApp(db, pipeline) {
 
 function start(opts = {}) {
   const db = opts.db || open(path.join(config.dataDir, 'kother.db'));
+  if (db.prepare('SELECT 1 FROM jobs WHERE trust_status IS NULL LIMIT 1').get()) trustCheck.reassessAll(db); // listings stored before graded trust statuses existed
   const pipeline = new Pipeline(db, opts.pipeline);
   const server = http.createServer(createApp(db, pipeline));
   return new Promise((resolve) => server.listen(opts.port ?? config.port, opts.host || '127.0.0.1', () => {

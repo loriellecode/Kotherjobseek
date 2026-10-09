@@ -116,9 +116,9 @@
     A.intRow = row;
   }
   function linkConfirm(j) {
-    const L = j.link || { host: '', notes: [] };
-    A.openModal(`${head('Check this link before you open it', `${j.title} — ${j.employer}`)}<p>This job’s application link goes to <b>${esc(L.host || 'an unknown site')}</b>.</p><ul class="changes">${(L.notes || []).map((n) => `<li>${esc(n)}</li>`).join('')}</ul>
-      <p class="note">We can’t confirm this site is safe. Before you apply: make sure the address looks right, never pay a fee to apply, and don’t share a Social Security number or bank details in an application form. A real employer won’t ask for those up front.</p>
+    const L = j.link || { host: '', reasons: [] };
+    A.openModal(`${head('Review the application destination', `${j.title} — ${j.employer}`)}<p>This job’s application link goes to <b>${esc(L.host || 'an unknown site')}</b>.</p><ul class="reasons">${(L.reasons || []).map((r) => `<li class="r-${r.kind}">${esc(r.text)}</li>`).join('')}</ul>
+      <p class="note">We couldn’t confirm the employer connection, so look before you share anything: does the address match the employer? Never pay a fee to apply, and don’t give a Social Security number or bank details in an application — a real employer won’t ask for those up front. Kother never submits anything for you.</p>
       <div class="foot"><button class="btn" data-action="close-modal">Cancel</button><a class="btn primary" href="${esc(j.applyUrl)}" target="_blank" rel="noopener noreferrer" data-action="apply-opened" data-id="${j.id}">Open ${esc(L.host)} ${icon('ext')}</a></div>`);
   }
   function reportModal(id) {

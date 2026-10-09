@@ -3,7 +3,7 @@
 const { now, j, tx } = require('./db');
 const config = require('./config');
 
-const COLS = ['title', 'employer', 'city', 'state', 'location_text', 'neighborhood', 'lat', 'lon', 'arrangement', 'remote', 'salary_min', 'salary_max', 'salary_period', 'salary_estimated', 'comp_note', 'employment_type', 'description', 'summary', 'required', 'preferred', 'edu_level', 'edu_inferred', 'edu_preferred', 'exp_years', 'exp_field', 'exp_inferred', 'exp_preferred', 'certs', 'categories', 'apply_url', 'link_level', 'link_notes', 'email_apply', 'logo_url', 'published', 'deadline', 'retrieved_at', 'raw_hash'];
+const COLS = ['title', 'employer', 'city', 'state', 'location_text', 'neighborhood', 'lat', 'lon', 'arrangement', 'remote', 'salary_min', 'salary_max', 'salary_period', 'salary_estimated', 'comp_note', 'employment_type', 'description', 'summary', 'required', 'preferred', 'edu_level', 'edu_inferred', 'edu_preferred', 'exp_years', 'exp_field', 'exp_inferred', 'exp_preferred', 'certs', 'categories', 'apply_url', 'link_level', 'link_notes', 'trust_status', 'trust_detail', 'trust_checked_at', 'email_apply', 'logo_url', 'published', 'deadline', 'retrieved_at', 'raw_hash'];
 
 function upsertJob(db, n, t) {
   t = t || now();
@@ -11,12 +11,15 @@ function upsertJob(db, n, t) {
   return tx(db, () => {
     const exact = db.prepare('SELECT * FROM jobs WHERE provider=? AND external_id=?').get(n.provider, n.external_id);
     if (exact) {
-      const sets = COLS.map((c) => `${c}=?`).join(',');
+      // Keep the result of a live re-check while the link is unchanged; otherwise take the fresh offline assessment.
+      const keepCheck = exact.apply_url === n.apply_url && /Live page check/.test(exact.trust_detail || '');
+      const cols = keepCheck ? COLS.filter((c) => !/^trust_|^link_level$/.test(c)) : COLS;
+      const sets = cols.map((c) => `${c}=?`).join(',');
       const changed = [];
       if (exact.salary_min !== n.salary_min || exact.salary_max !== n.salary_max) changed.push('salary');
       if (exact.deadline !== n.deadline) changed.push('deadline');
       if (exact.status !== 'active') changed.push('reopened');
-      db.prepare(`UPDATE jobs SET ${sets}, fingerprint=?, url_key=?, last_seen=?, last_verified=?, status='active' WHERE id=?`).run(...COLS.map((c) => n[c] ?? null), n.fingerprint, n.url_key, t, t, exact.id);
+      db.prepare(`UPDATE jobs SET ${sets}, fingerprint=?, url_key=?, last_seen=?, last_verified=?, status='active' WHERE id=?`).run(...cols.map((c) => n[c] ?? null), n.fingerprint, n.url_key, t, t, exact.id);
       return { id: exact.id, created: false, changed };
     }
     let dup = n.url_key ? db.prepare('SELECT * FROM jobs WHERE url_key=?').get(n.url_key) : null;
@@ -55,13 +58,24 @@ function verification(row, t) {
   return row.last_verified && t - row.last_verified <= config.verifiedWithinDays * 864e5 ? 'verified' : 'unverified';
 }
 
+/* Trust status → what the API exposes. High-risk and blocked listings never expose a direct application action. */
+const trust = require('./trust');
+function trustStatus(row) { return row.trust_status || (row.apply_url ? 'closer_look' : null); }
+function applyAllowed(row) { const st = trustStatus(row); return !st || trust.visibleApply(st); }
+function trustView(row) {
+  const st = trustStatus(row), d = j(row.trust_detail, {});
+  if (!st) return { level: null, label: '', host: '', reasons: [], evidence: [], notes: [], checkedAt: null, checks: null, expired: false };
+  const reasons = d.reasons || [{ kind: 'info', text: 'Employer connection not confirmed.' }];
+  return { level: st, label: trust.LABELS[st], host: d.host || '', reasons, notes: reasons.map((r) => r.text), evidence: d.evidence || [], checkedAt: row.trust_checked_at || null, checks: d.checks || null, expired: !!d.expired };
+}
+
 function jobView(row, t) {
   return {
     id: row.id, provider: row.provider, externalId: row.external_id, title: row.title, employer: row.employer, city: row.city, state: row.state, locationText: row.location_text, neighborhood: row.neighborhood,
     lat: row.lat, lon: row.lon, arrangement: row.arrangement, remote: !!row.remote, salaryMin: row.salary_min, salaryMax: row.salary_max, salaryPeriod: row.salary_period || 'year', salaryEstimated: !!row.salary_estimated, compNote: row.comp_note,
     type: row.employment_type, description: row.description, summary: row.summary, required: j(row.required, []), preferred: j(row.preferred, []),
     education: row.edu_level ? { level: row.edu_level, inferred: !!row.edu_inferred, preferred: !!row.edu_preferred } : null, experience: row.exp_years ? { years: row.exp_years, field: row.exp_field, inferred: !!row.exp_inferred, preferred: !!row.exp_preferred } : null,
-    certifications: j(row.certs, []), categories: j(row.categories, []), applyUrl: row.apply_url, link: Object.assign({ level: row.link_level || (row.apply_url ? 'caution' : null) }, j(row.link_notes, { host: '', notes: [] })), emailApply: j(row.email_apply, null), logoUrl: row.logo_url, published: row.published, deadline: row.deadline,
+    certifications: j(row.certs, []), categories: j(row.categories, []), applyUrl: applyAllowed(row) ? row.apply_url : null, link: trustView(row), emailApply: applyAllowed(row) ? j(row.email_apply, null) : null, logoUrl: row.logo_url, published: row.published, deadline: row.deadline,
     retrievedAt: row.retrieved_at, firstSeen: row.first_seen, lastSeen: row.last_seen, lastVerified: row.last_verified, status: row.status, verification: verification(row, t), alsoListed: j(row.also_listed, []),
   };
 }
@@ -70,4 +84,4 @@ function matcherJob(row) {
   const v = jobView(row);
   return v;
 }
-module.exports = { upsertJob, sweepStatuses, jobView, matcherJob, verification };
+module.exports = { trustView, upsertJob, sweepStatuses, jobView, matcherJob, verification };

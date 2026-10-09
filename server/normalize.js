@@ -3,7 +3,7 @@
  * Requirements detected from free text are flagged `inferred` so the UI can say so. */
 const crypto = require('node:crypto');
 const KJ = require('../shared/match');
-const { classify: classifyLink } = require('./linkSafety');
+const trust = require('./trust');
 const { detectEmailApply } = require('./emailEngine');
 
 const str = (v, max) => { const s = v === undefined || v === null ? '' : String(v).trim(); return max ? s.slice(0, max) : s; };
@@ -88,8 +88,9 @@ function normalizeListing(raw, provider, now) {
   const education = raw.education || (ext.education ? { level: ext.education.level, preferred: ext.education.preferred, inferred: true } : null);
   const experience = raw.experience || (ext.experience ? ext.experience : null);
   const certs = raw.certs && raw.certs.length ? raw.certs : ext.certs;
-  const link = str(raw.applyUrl) ? classifyLink(str(raw.applyUrl, 2000), provider, { feedHost: raw.feedHost }) : { url: null, level: null, host: '', notes: [] };
-  const applyUrl = link.url; // blocked links are never stored or shown
+  const emailApply = detectEmailApply(description + '\n' + str(raw.summary));
+  const tr = trust.assess({ provider, applyUrl: str(raw.applyUrl, 2000), employer, title, description, summary: str(raw.summary), salaryMin: numOrNull(raw.salaryMin), salaryMax: numOrNull(raw.salaryMax), deadline: isoDate(raw.deadline), emailApply }, { feedHost: raw.feedHost, now });
+  const applyUrl = tr.url; // only a parsed, de-fragmented http(s) address is ever stored; blocked links are not
   const city = str(raw.city, 100) || null;
   return {
     provider, external_id: externalId, fingerprint: fingerprint(title, employer, city || locationText, remote), url_key: applyUrl ? normalizeUrl(raw.canonicalUrl || applyUrl) : null,
@@ -101,7 +102,7 @@ function normalizeListing(raw, provider, now) {
     required: JSON.stringify((raw.required || []).map((x) => str(x, 200)).filter(Boolean)), preferred: JSON.stringify((raw.preferred || []).map((x) => str(x, 200)).filter(Boolean)),
     edu_level: education ? education.level : null, edu_inferred: education ? (education.inferred ? 1 : 0) : 0, exp_years: experience ? experience.years : null, exp_field: experience ? experience.field || null : null, exp_inferred: experience ? (experience.inferred ? 1 : 0) : 0,
     certs: JSON.stringify(certs || []), categories: JSON.stringify(raw.categories && raw.categories.length ? raw.categories : deriveCategories(title, description + ' ' + (raw.categoryHint || ''))),
-    apply_url: applyUrl, link_level: link.level, link_notes: JSON.stringify({ host: link.host, notes: link.notes }), email_apply: (() => { const d = detectEmailApply(description + '\n' + str(raw.summary)); return d ? JSON.stringify(d) : null; })(), logo_url: /^https:\/\//i.test(str(raw.logoUrl)) ? str(raw.logoUrl, 1000) : null, published: isoDate(raw.published), deadline: isoDate(raw.deadline),
+    apply_url: applyUrl, link_level: tr.status, link_notes: null, trust_status: tr.status, trust_detail: JSON.stringify({ label: tr.label, reasons: tr.reasons, evidence: tr.evidence, host: tr.host, expired: tr.expired, checks: tr.checks }), trust_checked_at: now, email_apply: emailApply ? JSON.stringify(emailApply) : null, logo_url: /^https:\/\//i.test(str(raw.logoUrl)) ? str(raw.logoUrl, 1000) : null, published: isoDate(raw.published), deadline: isoDate(raw.deadline),
     retrieved_at: now, raw_hash: crypto.createHash('sha1').update(JSON.stringify([title, employer, raw.salaryMin, raw.salaryMax, raw.deadline, description.slice(0, 500)])).digest('hex'),
     edu_preferred: education && education.preferred ? 1 : 0, exp_preferred: experience && experience.preferred ? 1 : 0,
   };

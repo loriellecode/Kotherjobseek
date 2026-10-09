@@ -51,7 +51,7 @@ function open(file) {
 /* Add columns introduced after a database was first created (SCHEMA only covers fresh databases). */
 function ensureColumn(db, table, col, def) { if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`); }
 function migrate(db) {
-  ensureColumn(db, 'jobs', 'email_apply', 'TEXT'); ensureColumn(db, 'jobs', 'link_level', 'TEXT'); ensureColumn(db, 'jobs', 'link_notes', 'TEXT');
+  ensureColumn(db, 'jobs', 'email_apply', 'TEXT'); ensureColumn(db, 'jobs', 'link_level', 'TEXT'); ensureColumn(db, 'jobs', 'link_notes', 'TEXT'); ensureColumn(db, 'jobs', 'trust_status', 'TEXT'); ensureColumn(db, 'jobs', 'trust_detail', 'TEXT'); ensureColumn(db, 'jobs', 'trust_checked_at', 'INTEGER');
   for (const [c, d] of [['status', "TEXT NOT NULL DEFAULT 'ready'"], ['error', 'TEXT'], ['insights', 'TEXT'], ['analyzed_at', 'INTEGER'], ['accepted_count', 'INTEGER NOT NULL DEFAULT 0'], ['rejected_count', 'INTEGER NOT NULL DEFAULT 0'], ['duplicate_count', 'INTEGER NOT NULL DEFAULT 0']]) ensureColumn(db, 'resumes', c, d);
   for (const [c, d] of [['origin', "TEXT NOT NULL DEFAULT 'stated'"], ['evidence', "TEXT NOT NULL DEFAULT '[]'"], ['grp', 'TEXT']]) ensureColumn(db, 'resume_proposals', c, d);
 }

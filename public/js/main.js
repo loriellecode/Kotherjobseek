@@ -73,13 +73,14 @@
   /* ---------- editorial imagery (server-side Pexels proxy; attribution always shown) ---------- */
   function hydrateImages() {
     document.querySelectorAll('[data-img-topic]').forEach(async (el) => {
-      const t = el.dataset.imgTopic;
-      if (!(t in ses.images)) ses.images[t] = A.api('GET', '/api/imagery/' + encodeURIComponent(t), undefined, { quiet: true }).then((r) => r.photo).catch(() => null);
-      const p = await ses.images[t];
+      const t = el.dataset.imgTopic, vi = el.dataset.imgI || '0', key = t + '#' + vi;
+      if (!(key in ses.images)) ses.images[key] = A.api('GET', '/api/imagery/' + encodeURIComponent(t) + (vi !== '0' ? '?i=' + vi : ''), undefined, { quiet: true }).then((r) => r.photo).catch(() => null);
+      const p = await ses.images[key];
       if (!p || !document.body.contains(el) || !/^https:\/\/images\.pexels\.com\//.test(p.src.medium)) return;
       const banner = el.classList.contains('banner'), alt = p.alt || '';
       const credit = `<a href="${esc(p.pageUrl)}" target="_blank" rel="noopener noreferrer">Photo by ${esc(p.photographer)}</a> on <a href="https://www.pexels.com" target="_blank" rel="noopener noreferrer">Pexels</a>`;
       if (el.dataset.hero) { el.style.setProperty('--photo', `url(${p.src.large2x && window.innerWidth > 1400 ? p.src.large2x : p.src.large})`); el.classList.add('has-photo'); const c = el.closest('.hero').querySelector('.hero-credit'); if (c) c.innerHTML = credit; el.hidden = false; return; }
+      if (el.dataset.card) { el.innerHTML = `<img src="${esc(p.src.medium)}" srcset="${esc(p.src.small)} 350w, ${esc(p.src.medium)} 940w" sizes="340px" alt="" loading="lazy" decoding="async" style="background:${esc(p.avgColor || 'transparent')}"><a class="credit" href="${esc(p.pageUrl)}" target="_blank" rel="noopener noreferrer" title="Photo by ${esc(p.photographer)} on Pexels">Photo: ${esc(p.photographer)} · Pexels</a>`; el.hidden = false; return; }
       if (banner) el.innerHTML = `<img src="${esc(p.src.large)}" srcset="${esc(p.src.small)} 350w, ${esc(p.src.medium)} 940w, ${esc(p.src.large)} 1280w, ${esc(p.src.large2x)} 2400w" sizes="(min-width: 1180px) 1120px, 100vw" width="${p.width}" height="${p.height}" alt="${esc(alt)}" loading="lazy" decoding="async" style="background:${esc(p.avgColor || 'var(--surface-2)')}"><span class="credit">${credit}</span>`;
       else { el.innerHTML = `<img src="${esc(p.src.small)}" srcset="${esc(p.src.small)} 350w, ${esc(p.src.medium)} 940w" sizes="96px" alt="" loading="lazy" decoding="async" style="background:${esc(p.avgColor || 'var(--surface-2)')}">`; const sec = el.closest('.section'); if (sec && !sec.querySelector('.credit-line')) sec.insertAdjacentHTML('beforeend', `<p class="credit-line">${credit}</p>`); }
       el.hidden = false;
@@ -132,7 +133,7 @@
       save: () => run(() => setSaved(id)), dismiss: () => run(() => dismiss(id)), 'dismiss-detail': () => run(() => dismiss(id, true)),
       restore: () => run(async () => { await A.api('DELETE', `/api/jobs/${id}/dismissed`); A.job(id).userState.dismissed = null; A.render(true); A.toast('Restored to your feed.'); }),
       'restore-report': () => run(async () => { await A.api('DELETE', `/api/jobs/${id}/report`); A.job(id).userState.reported = null; A.render(true); A.toast('Report withdrawn.'); }),
-      'mark-applied': () => run(() => markApplied(id)), 'email-open': () => run(() => A.openEmailAssistant(id)), 'email-followup': () => run(() => A.openEmailAssistant(id, { autoAction: 'followup' })), 'open-link': () => A.editors.linkConfirm(A.job(id)), track: () => A.editors.trackerModal(Number(id)), report: () => A.editors.reportModal(Number(id)),
+      'mark-applied': () => run(() => markApplied(id)), 'trust-recheck': () => run(async () => { A.toast('Re-checking…'); const r = await A.api('POST', `/api/jobs/${id}/recheck`); const k = S.jobs.findIndex((x) => x.id === Number(id)); if (k >= 0) S.jobs[k] = r; A.render(true); A.toast('Re-checked: ' + (r.link.label || 'done') + '.'); }), 'email-open': () => run(() => A.openEmailAssistant(id)), 'email-followup': () => run(() => A.openEmailAssistant(id, { autoAction: 'followup' })), 'open-link': () => A.editors.linkConfirm(A.job(id)), track: () => A.editors.trackerModal(Number(id)), report: () => A.editors.reportModal(Number(id)),
       'set-mode': () => { ses.mode = t.dataset.v; A.render(true); }, 'set-where': () => { ses.where = t.dataset.v; A.render(true); },
       'toggle-search': () => { const away = route().r !== 'discover'; ses.searchOpen = away ? true : !ses.searchOpen; if (!ses.searchOpen) ses.q = ''; if (away) location.hash = '#/discover'; else A.render(true); const q = document.getElementById('q'); if (q) q.focus(); },
       cat: () => { ses.cat = t.dataset.cat; ses.q = ''; A.render(); }, more: () => { ses.cat = t.dataset.cat; ses.q = ''; if (route().r !== 'discover') location.hash = '#/discover'; A.render(); window.scrollTo(0, 0); },

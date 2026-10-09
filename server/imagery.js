@@ -15,12 +15,19 @@ const TTL = 7 * 864e5;
 
 function status() { return config.pexels.key ? { configured: true } : { configured: false, missing: ['PEXELS_API_KEY'] }; }
 
-async function getImage(db, topic) {
+const KEEP = 8;
+const shape = (pick) => ({ id: pick.id, pageUrl: pick.url, photographer: pick.photographer, photographerUrl: pick.photographer_url, alt: pick.alt || '', avgColor: pick.avg_color || null, width: pick.width, height: pick.height,
+  src: { small: pick.src.small, medium: pick.src.medium, large: pick.src.large, large2x: pick.src.large2x }, source: 'Pexels', license: 'https://www.pexels.com/license/' });
+/* The cache holds up to 8 photos per topic so cards on one page don't all show the same picture; `variant` picks one (stable within a day). */
+const choose = (list, variant) => (list.length ? list[(Math.floor(now() / 864e5) + (Number(variant) || 0)) % list.length] : null);
+const listOf = (d) => (d && Array.isArray(d.list) ? d.list : d && d.id ? [d] : []);
+
+async function getImage(db, topic, variant) {
   topic = String(topic || '').toLowerCase();
   if (!TOPICS[topic]) return { configured: status().configured, photo: null, error: 'unknown topic' };
   if (!config.pexels.key) return { configured: false, photo: null };
   const row = db.prepare('SELECT * FROM images WHERE topic=?').get(topic);
-  if (row && now() - row.fetched_at < TTL) return { configured: true, photo: j(row.data, null) };
+  if (row && now() - row.fetched_at < TTL) return { configured: true, photo: choose(listOf(j(row.data, null)), variant) };
   try {
     const p = new URLSearchParams({ query: TOPICS[topic], orientation: 'landscape', size: 'medium', per_page: '15' });
     const res = await fetch(`${config.pexels.base}/search?${p}`, { headers: { Authorization: config.pexels.key }, signal: AbortSignal.timeout(15000) });
@@ -28,13 +35,11 @@ async function getImage(db, topic) {
     const data = await res.json();
     const photos = (data.photos || []).filter((x) => x && x.src && x.photographer && x.url);
     if (!photos.length) throw new Error('no photos returned');
-    const pick = photos[Math.floor(now() / 864e5) % photos.length]; // varies daily, stable within a day
-    const photo = { id: pick.id, pageUrl: pick.url, photographer: pick.photographer, photographerUrl: pick.photographer_url, alt: pick.alt || '', avgColor: pick.avg_color || null, width: pick.width, height: pick.height,
-      src: { small: pick.src.small, medium: pick.src.medium, large: pick.src.large, large2x: pick.src.large2x }, source: 'Pexels', license: 'https://www.pexels.com/license/' };
-    db.prepare('INSERT INTO images(topic,data,fetched_at) VALUES(?,?,?) ON CONFLICT(topic) DO UPDATE SET data=excluded.data, fetched_at=excluded.fetched_at').run(topic, JSON.stringify(photo), now());
-    return { configured: true, photo };
+    const list = photos.slice(0, KEEP).map(shape);
+    db.prepare('INSERT INTO images(topic,data,fetched_at) VALUES(?,?,?) ON CONFLICT(topic) DO UPDATE SET data=excluded.data, fetched_at=excluded.fetched_at').run(topic, JSON.stringify({ list }), now());
+    return { configured: true, photo: choose(list, variant) };
   } catch (e) {
-    if (row) return { configured: true, photo: j(row.data, null), stale: true };
+    if (row) return { configured: true, photo: choose(listOf(j(row.data, null)), variant), stale: true };
     return { configured: true, photo: null, error: 'Image service unavailable' };
   }
 }

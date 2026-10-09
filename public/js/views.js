@@ -10,7 +10,7 @@
   /* ---------- small components ---------- */
   function art(j, cls) {
     const img = j.logoUrl ? `<img src="${esc(j.logoUrl)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : '';
-    return `<div class="art ${cls || ''}" style="--h:${A.hue(j.employer)}" aria-hidden="true">${img}<span class="wm">${esc(j.employer)}</span></div>`;
+    return `<div class="art ${cls || ''}" style="--h:${A.hue(j.employer)}">${img}<span class="wm" aria-hidden="true">${esc(j.employer)}</span><div class="cardimg" data-img-topic="${esc(A.topicFor(j))}" data-img-i="${j.id % 8}" data-card="1" hidden></div></div>`;
   }
   const logo = (j) => `<span class="mono">${j.logoUrl ? `<img src="${esc(j.logoUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}<b>${esc(A.initials(j.employer))}</b></span>`;
   const isNew = (j) => ses().newIds.has(j.id);
@@ -48,17 +48,25 @@
       ${j.deadline ? `<div class="meta">Closes ${esc(A.fmtDate(j.deadline))}</div>` : ''}${blurb ? `<p class="blurb">${esc(blurb)}</p>` : ''}
       <div class="foot"><span class="matchpill ${m.classification}">${esc(KJ.CLASS_SHORT[m.classification])}</span><span class="grow"></span>${jobButtons(j)}</div></article>`;
   }
-  /* Links are classified on the server (see server/linkSafety.js). Unrecognized sites require an explicit review step before opening. */
+  /* Trust is assessed on the server (see server/trust.js). Nothing is "verified": statuses describe the evidence found. closer_look needs an explicit review step; high_risk hides the apply action. */
+  const TRUST_ICON = { trusted: 'check', checked: 'check', closer_look: 'alert', high_risk: 'alert' };
   function applyButton(j) {
-    if (!j.applyUrl) return `<span class="btn primary" aria-disabled="true">${j.link && j.link.level === 'blocked' ? 'Link withheld for your safety' : 'No application link in this listing'}</span>`;
-    if (!j.link || j.link.level === 'caution') return `<button class="btn caution" data-action="open-link" data-id="${j.id}">Review link, then open ${icon('ext')}</button>`;
-    return `<a class="btn primary" href="${esc(j.applyUrl)}" target="_blank" rel="noopener noreferrer" data-action="apply-opened" data-id="${j.id}">Apply on ${j.link.level === 'redirect' ? 'Adzuna (forwards to employer)' : 'employer site'} ${icon('ext')}</a>`;
+    const lv = j.link && j.link.level;
+    if (lv === 'high_risk') return '<span class="btn primary" aria-disabled="true">Application link hidden — high risk</span>';
+    if (!j.applyUrl) return `<span class="btn primary" aria-disabled="true">${j.emailApply ? 'Apply by email — see below' : 'No application link in this listing'}</span>`;
+    if (!lv || lv === 'closer_look') return `<button class="btn caution" data-action="open-link" data-id="${j.id}">Review destination, then open ${icon('ext')}</button>`;
+    return `<a class="btn primary" href="${esc(j.applyUrl)}" target="_blank" rel="noopener noreferrer" data-action="apply-opened" data-id="${j.id}">Apply on ${esc(j.link.host || 'the employer’s site')} ${icon('ext')}</a>`;
   }
+  const ago = (t) => { if (!t) return 'never'; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} hr ago` : `${Math.round(m / 1440)} days ago`; };
   function linkNote(j) {
     const L = j.link || {}; if (!L.level) return '';
-    const ic = { trusted: 'check', redirect: 'check', caution: 'alert', blocked: 'alert' }[L.level];
-    const head = { trusted: `Opens ${L.host}`, redirect: `Opens ${L.host}`, caution: `Unrecognized site: ${L.host}`, blocked: 'No application link shown' }[L.level];
-    return `<p class="linknote ${L.level}">${icon(ic)}<span><b>${esc(head)}.</b> ${esc((L.notes || []).join(' '))}${L.level === 'blocked' ? ' Search for this job on the employer’s own website instead.' : ''}</span></p>`;
+    const good = (L.reasons || []).filter((r) => r.kind === 'good'), rest = (L.reasons || []).filter((r) => r.kind !== 'good');
+    const head = good[0] ? good[0].text : (rest[0] ? rest[0].text : L.label);
+    const li = (r) => `<li class="r-${r.kind}">${esc(r.text)}</li>`;
+    return `<div class="trust ${L.level}"><p class="linknote ${L.level}">${icon(TRUST_ICON[L.level] || 'alert')}<span><b>${esc(L.label)}.</b> ${esc(head)}${L.host ? ` <span class="host">${esc(L.host)}</span>` : ''}</span></p>
+      <details class="how"><summary>Why this status</summary><ul class="reasons">${(L.reasons || []).map(li).join('')}</ul>${(L.evidence || []).length ? `<p class="note"><b>Evidence:</b> ${(L.evidence || []).map(esc).join(' ')}</p>` : ''}
+      <p class="note">Last checked ${esc(ago(L.checkedAt))}. ${L.checks ? `Automated: ${(L.checks.automated || []).map(esc).join('; ')}. <b>Not done:</b> ${(L.checks.notDone || []).map(esc).join('; ')}.` : ''} This is guidance, not a guarantee — always review the employer and the site before sharing personal information.</p>
+      <button class="btn sm" data-action="trust-recheck" data-id="${j.id}">Re-check this listing</button></details></div>`;
   }
   function featuredCard(j, label) {
     const m = j.match, why = m.reasons.slice(0, 3), saved = !!j.userState.saved, cat = (j.categories || [])[0] || '';

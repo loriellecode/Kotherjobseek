@@ -42,6 +42,7 @@ module.exports = {
     usajobs: { key: e.USAJOBS_API_KEY, email: e.USAJOBS_USER_EMAIL, base: e.USAJOBS_BASE_URL || 'https://data.usajobs.gov/api', dailyBudget: int(e.USAJOBS_DAILY_BUDGET, 200) },
     feeds: { file: path.resolve(e.EMPLOYER_FEEDS_FILE || path.join(root, 'config', 'employer-feeds.json')), userAgent: e.FEED_USER_AGENT || 'KotherJobSearch/1.0', contact: e.FEED_CONTACT_URL || '' },
   },
+  trust: { networkChecks: e.TRUST_NETWORK_CHECKS !== 'false', allowPrivateFetch: e.NODE_ENV === 'test' && e.TRUST_ALLOW_PRIVATE_FETCH === 'true' },
   ai: { key: e.ANTHROPIC_API_KEY, base: e.ANTHROPIC_BASE_URL || 'https://api.anthropic.com', model: e.EMAIL_AI_MODEL || 'claude-sonnet-5-5' },
   pexels: { key: e.PEXELS_API_KEY, base: e.PEXELS_BASE_URL || 'https://api.pexels.com/v1' },
   push: { publicKey: e.VAPID_PUBLIC_KEY, privateKey: e.VAPID_PRIVATE_KEY, subject: e.VAPID_SUBJECT || 'mailto:admin@example.com' },
