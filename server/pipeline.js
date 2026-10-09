@@ -116,7 +116,7 @@ class Pipeline {
           let fresh = 0;
           for (const raw of res.listings) {
             const n = normalizeListing(raw, prov.id, now()); if (!n) continue;
-            if (!KJ.inSearchStates({ state: n.state, locationText: n.location_text, remote: n.remote })) { result.outsideStates = (result.outsideStates || 0) + 1; continue; }
+            if (!KJ.inSearchStates({ state: n.state, locationText: n.location_text, city: n.city, remote: n.remote })) { result.outsideStates = (result.outsideStates || 0) + 1; continue; }
             const r = upsertJob(this.db, n);
             if (r.created) { result.created++; fresh++; } else if (r.duplicate) result.duplicates++; else { result.updated++; if (r.changed.length) this.noteChange(userId, r.id, r.changed); }
           }

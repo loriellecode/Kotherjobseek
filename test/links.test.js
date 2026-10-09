@@ -30,11 +30,12 @@ t.describe('application-link safety', () => {
   });
   t.it('end to end: the API exposes link level + host; imports with unsafe links never reach the feed with a URL', async () => {
     const env = await boot(), c = await env.signup();
-    await c.req('POST', '/api/jobs/import', { jobs: [{ id: 'a', title: 'Budget Analyst', employer: 'Good City', city: 'Stockton', url: 'https://www.cityofstockton.gov/jobs/1' }, { id: 'b', title: 'Budget Analyst', employer: 'Odd Staffing', city: 'Stockton', url: 'https://odd-staffing.example/apply' }, { id: 'c', title: 'Budget Analyst', employer: 'Shady', city: 'Stockton', url: 'https://user:pw@shady.example/apply' }, { id: 'd', title: 'Budget Analyst', employer: 'Short', city: 'Stockton', url: 'https://bit.ly/abc' }] });
+    await c.req('POST', '/api/jobs/import', { jobs: [{ id: 'a', title: 'Budget Analyst', employer: 'Good City', city: 'Stockton', description: 'Prepare and monitor budgets and financial reports for the department.', url: 'https://www.cityofstockton.gov/jobs/1' }, { id: 'b', title: 'Budget Analyst', employer: 'Odd Staffing', city: 'Stockton', description: 'Prepare and monitor budgets and financial reports for the department.', url: 'https://odd-staffing.example/apply' }, { id: 'c', title: 'Budget Analyst', employer: 'Shady', city: 'Stockton', description: 'Prepare and monitor budgets and financial reports for the department.', url: 'https://user:pw@shady.example/apply' }, { id: 'd', title: 'Budget Analyst', employer: 'Short', city: 'Stockton', description: 'Prepare and monitor budgets and financial reports for the department.', url: 'https://bit.ly/abc' }] });
     await env.pipeline.drain(); const jobs = (await c.req('GET', '/api/feed')).data.jobs, by = (e) => jobs.find((j) => j.employer === e);
+    try {
     assert.equal(by('Good City').link.level, 'trusted'); assert.equal(by('Good City').link.host, 'www.cityofstockton.gov'); assert.equal(by('Odd Staffing').link.level, 'caution');
-    for (const e of ['Shady', 'Short']) { assert.equal(by(e).applyUrl, null); assert.equal(by(e).link.level, 'blocked'); assert.ok(by(e).link.notes[0].length > 10); }
-    env.close();
+    for (const e of ['Shady', 'Short']) assert.equal(by(e), undefined, 'a listing whose only link is unsafe has no way to apply, so it is not shown');
+    } finally { env.close(); }
   });
 });
 

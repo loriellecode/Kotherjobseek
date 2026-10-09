@@ -42,6 +42,6 @@ function feedFor(db, userId) {
     FROM jobs jb JOIN matches m ON m.job_id=jb.id AND m.user_id=? LEFT JOIN user_jobs u ON u.job_id=jb.id AND u.user_id=?
     WHERE jb.status != 'closed' OR u.saved_at IS NOT NULL OR jb.id IN (SELECT job_id FROM applications WHERE user_id=?)
     ORDER BY m.overall DESC LIMIT 2000`).all(userId, userId, userId);
-  return rows.filter((r) => KJ.inSearchStates({ state: r.state, locationText: r.location_text, remote: !!r.remote }) && hasInfoAndWayToApply(r)).map((r) => Object.assign(jobView(r, t), { match: j(r.m_detail, null), userState: { saved: r.saved_at || null, dismissed: r.dismissed_at || null, reported: r.reported || null, firstSurfaced: r.first_surfaced || null } }));
+  return rows.filter((r) => KJ.inSearchStates({ state: r.state, locationText: r.location_text, city: r.city, remote: !!r.remote }) && hasInfoAndWayToApply(r)).map((r) => Object.assign(jobView(r, t), { match: j(r.m_detail, null), userState: { saved: r.saved_at || null, dismissed: r.dismissed_at || null, reported: r.reported || null, firstSurfaced: r.first_surfaced || null } }));
 }
 module.exports = { rematchUser, strongIds, feedFor, latestResumeText };

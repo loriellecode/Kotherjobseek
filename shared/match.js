@@ -301,7 +301,8 @@
   function inSearchStates(job) {
     const st = jobState(job);
     if (st) return st === 'CA';
-    return !!job.remote; // no state named: keep only remote listings (checked again against the listing text below)
+    // No state named: keep it if it is remote, or if the city is one of the California places we know.
+    return !!job.remote || !!(job.city && coordsFor(job.city));
   }
 
   Object.assign(KJ, { stateCode, jobState, inSearchStates, EDU_RANK, EDU_LABEL, CATEGORIES, CLASS_LABEL, CLASS_SHORT, CLASS_BARS, FIELD_WORDS, norm, num, tokens, fmtMoney, annual, profileFloor, profileDesired, salaryText, salaryParts, coordsFor, miles, evaluate, evalLocation, evalSalary, buildFeed, categoryFeed, search, chips, completion, isNearby, cityOnly, stripPlace });
