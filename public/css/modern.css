@@ -283,3 +283,5 @@ body::before { background: #000000; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dock { background: rgba(24, 24, 28, .96); border-color: #34343c; } }
 .card, .filterbar { box-shadow: 0 0 0 1px var(--line); }
 .fsel select { background-color: var(--surface-2); }
+/* header band: purple-blue like the other accents */
+body::before { background: radial-gradient(520px 220px at 12% 18%, rgba(255,255,255,.12), transparent 70%), linear-gradient(160deg, #2a1fc4 0%, #3b2fe0 55%, #5b45ec 100%); }
