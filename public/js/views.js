@@ -37,7 +37,7 @@
   /* ---------- cards ---------- */
   function card(j, variant) {
     const m = j.match, more = j.remote ? 'Remote' : (j.categories || [])[0] || 'Nearby', cat = (j.categories || [])[0] || '';
-    const blurb = variant === 'wide' ? (m.reasons[0] ? m.reasons.slice(0, 2).join('. ') + '.' : '') : '';
+    const blurb = ''; // the “why this matches” reasons live on the job’s detail page
     const chipTxt = j.remote ? 'Remote' : j.type || '';
     const emailChip = j.emailApply && j.emailApply.confidence === 'high' ? '<span class="chip-over mail">✉ Email to apply</span>' : '';
     return `<article class="card ${variant || ''}" data-job="${j.id}"><a class="open" href="#/job/${j.id}" aria-label="${esc(j.title)}, ${esc(j.employer)}"></a>
@@ -152,18 +152,33 @@
   }
 
   /* ---------- "Other Careers to Explore" ---------- */
-  function careerCard(c) {
-    const inc = c.state === 'include', st = c.stats;
+  const careerStats = (c) => {
+    const st = c.stats;
     const pay = st && st.salary ? `${KJ.fmtMoney(st.salary.low)}–${KJ.fmtMoney(st.salary.high)}/yr across ${st.salary.n} current listings` : 'Not enough current listings with posted pay to say';
     const geo = st ? (st.openings ? `${A.plural(st.openings, 'current opening')}${st.nearby ? `, ${st.nearby} in your preferred area` : ', none in your preferred area yet'}${st.cities.length ? ' · ' + st.cities.slice(0, 3).map((x) => x.city).join(', ') : ''}` : 'No current openings found yet') : '';
-    const list = (arr) => `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
-    return `<article class="card career" data-career="${esc(c.id)}"><div class="employer">${esc(c.category)}${c.strength ? ' · ' + esc(c.strength) + ' evidence' : ''}</div><h3>${esc(c.title)}</h3><p class="blurb" style="-webkit-line-clamp:3">${esc(c.does)}</p>
-      <h4>Why your background may be relevant</h4>${list(c.evidence.slice(0, 3).map((e) => e.text))}
-      ${c.transferable.length ? `<h4>Transferable skills</h4><p class="meta">${esc(c.transferable.slice(0, 4).join(' · '))}</p>` : ''}
-      <dl class="mini-kv"><div><dt>Pay in current listings</dt><dd>${esc(pay)}</dd></div>${geo ? `<div><dt>Availability</dt><dd>${esc(geo)}</dd></div>` : ''}</dl>
-      <details><summary>Qualifications and gaps</summary><h4>Typically required</h4>${list(c.essential)}${c.known.length ? `<h4>Known to be satisfied</h4>${list(c.known)}` : ''}${c.toConfirm.length ? `<h4>Reported — needs your confirmation</h4>${list(c.toConfirm)}` : ''}${c.unknown.length ? `<h4>Unknown</h4>${list(c.unknown)}` : ''}${c.unmet.length ? `<h4>Appears unmet</h4>${list(c.unmet)}` : ''}${c.licensingNote ? `<p class="note warnline">${icon('alert')} ${esc(c.licensingNote)}</p>` : ''}<p class="note">Requirements are typical and vary by employer.</p></details>
-      <div class="foot"><button class="btn sm ${inc ? 'on' : ''}" data-action="career-state" data-id="${esc(c.id)}" data-state="${inc ? 'clear' : 'include'}" aria-pressed="${inc}">${inc ? 'Included in searches ✓' : 'Include in searches'}</button><button class="btn sm quiet" data-action="career-state" data-id="${esc(c.id)}" data-state="exclude">Exclude</button>${st && st.openings ? `<button class="btn sm quiet" data-action="career-view" data-q="${esc(c.searchTerms[0])}">View openings</button>` : ''}</div></article>`;
+    return { pay, geo };
+  };
+  const bullets = (arr) => `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  /* A career card is a short summary; tapping it opens everything (what the job is, why it may be relevant, skills, pay, gaps). */
+  function careerCard(c) {
+    const inc = c.state === 'include', st = c.stats, { pay, geo } = careerStats(c);
+    const short = st && st.salary ? `${KJ.fmtMoney(st.salary.low)}–${KJ.fmtMoney(st.salary.high)}/yr` : '';
+    const open = st && st.openings ? A.plural(st.openings, 'opening') + (st.nearby ? ` · ${st.nearby} nearby` : '') : 'No openings found yet';
+    return `<article class="card career" data-career="${esc(c.id)}" data-action="career-open" data-id="${esc(c.id)}" tabindex="0" role="button" aria-label="${esc(c.title)} — see details"><div class="employer">${esc(c.category)}${c.strength ? ' · ' + esc(c.strength) + ' evidence' : ''}</div><h3>${esc(c.title)}</h3>
+      <p class="meta">${esc([short, open].filter(Boolean).join(' · '))}</p>
+      <div class="foot"><button class="btn sm ${inc ? 'on' : ''}" data-action="career-state" data-id="${esc(c.id)}" data-state="${inc ? 'clear' : 'include'}" aria-pressed="${inc}">${inc ? 'Included ✓' : 'Include in searches'}</button><button class="btn sm quiet" data-action="career-state" data-id="${esc(c.id)}" data-state="exclude">Exclude</button><span class="grow"></span><span class="more" aria-hidden="true">Details ›</span></div></article>`;
   }
+  A.careerDetail = function (id) {
+    const c = (S().careers.suggestions || []).find((x) => x.id === id); if (!c) return;
+    const inc = c.state === 'include', st = c.stats, { pay, geo } = careerStats(c);
+    A.openModal(`<h2 id="mt">${esc(c.title)}</h2><p class="sub">${esc(c.category)}${c.strength ? ' · ' + esc(c.strength) + ' evidence' : ''}</p>
+      <p>${esc(c.does)}</p>
+      <h4>Why your background may be relevant</h4>${bullets(c.evidence.map((e) => e.text))}
+      ${c.transferable.length ? `<h4>Transferable skills</h4><p>${esc(c.transferable.join(' · '))}</p>` : ''}
+      <dl class="mini-kv"><div><dt>Pay in current listings</dt><dd>${esc(pay)}</dd></div>${geo ? `<div><dt>Availability</dt><dd>${esc(geo)}</dd></div>` : ''}</dl>
+      <h4>Typically required</h4>${bullets(c.essential)}${c.known.length ? `<h4>Known to be satisfied</h4>${bullets(c.known)}` : ''}${c.toConfirm.length ? `<h4>Reported — needs your confirmation</h4>${bullets(c.toConfirm)}` : ''}${c.unknown.length ? `<h4>Unknown</h4>${bullets(c.unknown)}` : ''}${c.unmet.length ? `<h4>Appears unmet</h4>${bullets(c.unmet)}` : ''}${c.licensingNote ? `<p class="note warnline">${icon('alert')} ${esc(c.licensingNote)}</p>` : ''}<p class="note">Requirements are typical and vary by employer.</p>
+      <div class="foot"><button class="btn" data-action="close-modal">Close</button><button class="btn sm ${inc ? 'on' : ''}" data-action="career-state" data-id="${esc(c.id)}" data-state="${inc ? 'clear' : 'include'}">${inc ? 'Included in searches ✓' : 'Include in searches'}</button>${st && st.openings ? `<button class="btn primary" data-action="career-view" data-q="${esc(c.searchTerms[0])}">View openings</button>` : ''}</div>`);
+  };
   function careerSection() {
     const C = S().careers; if (!C) return '';
     const shown = C.suggestions.filter((c) => c.otherCategory || c.state === 'include').slice(0, 10);
