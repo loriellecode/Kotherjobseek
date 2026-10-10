@@ -313,3 +313,8 @@ html { background: var(--bg) !important; }
 .topbar, .topbar .eyebrow, h1.page, .topbar .back, .back { color: var(--ink) !important; }
 .topbar .eyebrow { opacity: .85 !important; }
 .dock { background: var(--surface) !important; border: 2px solid var(--line) !important; box-shadow: none; }
+
+/* Speed: skip layout and painting for sections that are off-screen */
+.section { content-visibility: auto; contain-intrinsic-size: auto 480px; }
+
+.card.morecard { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 220px; width: min(60vw, 220px); border: 2px dashed var(--line); background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; } .card.morecard b { font-size: 18px; color: var(--accent); } .card.morecard span { font-size: 15px; color: var(--muted); }

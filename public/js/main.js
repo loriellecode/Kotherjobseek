@@ -61,10 +61,12 @@
     app.querySelectorAll('[data-rail]').forEach((el) => { if (rails[el.dataset.rail]) el.scrollLeft = rails[el.dataset.rail]; });
     if (keep) window.scrollTo(0, y);
     if (q) { const el = document.getElementById('q'); if (el) { el.focus(); el.setSelectionRange(caret, caret); } }
-    app.querySelectorAll('.rail').forEach((rail) => {
-      const sec = rail.closest('.section'), prev = sec && sec.querySelector('[data-dir="-1"]'), next = sec && sec.querySelector('[data-dir="1"]');
-      const upd = () => { if (prev) { prev.disabled = rail.scrollLeft < 4; next.disabled = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 4; } };
-      rail.addEventListener('scroll', upd, { passive: true }); upd();
+    // Rail arrow buttons: read all positions first, then write (no forced re-layout per rail), once the page has been laid out.
+    const railEls = [...app.querySelectorAll('.rail')];
+    if (railEls.length) requestAnimationFrame(() => {
+      const state = railEls.map((rail) => { const sec = rail.closest('.section'); return { rail, prev: sec && sec.querySelector('[data-dir="-1"]'), next: sec && sec.querySelector('[data-dir="1"]') }; });
+      const apply = () => { const r = state.map((x) => [x.rail.scrollLeft < 4, x.rail.scrollLeft + x.rail.clientWidth >= x.rail.scrollWidth - 4]); state.forEach((x, i) => { if (x.prev) { x.prev.disabled = r[i][0]; x.next.disabled = r[i][1]; } }); };
+      apply(); state.forEach((x) => x.rail.addEventListener('scroll', () => { const l = x.rail.scrollLeft; if (x.prev) { x.prev.disabled = l < 4; x.next.disabled = l + x.rail.clientWidth >= x.rail.scrollWidth - 4; } }, { passive: true }));
     });
     document.title = r === 'job' && A.job(arg) ? `${A.job(arg).title} — Jobgeek` : 'Jobgeek';
     hydrateImages();
@@ -140,6 +142,7 @@
       cat: () => { ses.cat = t.dataset.cat; ses.q = ''; A.render(); }, more: () => { ses.cat = t.dataset.cat; ses.q = ''; if (route().r !== 'discover') location.hash = '#/discover'; A.render(); window.scrollTo(0, 0); },
       'clear-search': () => { ses.q = ''; A.render(); }, rail: () => { const r = document.getElementById(t.dataset.target); r.scrollBy({ left: Number(t.dataset.dir) * r.clientWidth * 0.85, behavior: 'smooth' }); },
       back: () => goBack(),
+      'rail-more': () => { const c = ses.railCap || (ses.railCap = {}); const step = Number(t.dataset.step) || 16; c[t.dataset.id] = (c[t.dataset.id] || (step === 24 ? 24 : 16)) + step; A.render(true); },
       notes: () => run(async () => { ses.notesOpen = !ses.notesOpen; A.render(true); if (ses.notesOpen && S.unread) { await A.api('POST', '/api/notifications/read'); S.unread = 0; S.notes.forEach((n) => (n.read_at = n.read_at || Date.now())); setTimeout(() => A.render(true), 0); } }),
       'close-pop': () => { ses.notesOpen = false; }, 'close-modal': A.closeModal,
       edit: () => A.editors.open(t.dataset.sec),

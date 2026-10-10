@@ -84,8 +84,15 @@
         <div class="why-col"><p class="mini-ind"><span>Salary: ${esc(m.salary.text)}</span><span>Location: ${esc(m.location.text)}</span></p>${linkNote(j)}<p class="src">Source: ${esc(A.providerName(j.provider))}${j.lastVerified ? ' · last seen ' + esc(A.ago(j.lastVerified)) : ''}</p></div></section>`;
   }
   function imageSlot(topic, kind) { return topic ? `<div class="${kind}" data-img-topic="${esc(topic)}" hidden></div>` : ''; }
+  /* A grid of cards, 24 at a time, with a "Show more" button (long lists are slow to draw on a phone). */
+  function gridCards(list, key) {
+    const caps = ses().railCap || (ses().railCap = {}), cap = caps[key] || 24;
+    return list.slice(0, cap).map((j) => card(j)).join('') + (list.length > cap ? `<button class="card morecard" data-action="rail-more" data-id="${esc(key)}" data-step="24"><b>Show ${Math.min(24, list.length - cap)} more</b><span>${list.length - cap} left</span></button>` : '');
+  }
   function section(sec) {
-    const cards = sec.items.map((it, i) => card(it, sec.wide && i < sec.wide ? 'wide' : sec.compact ? 'compact' : '')).join('');
+    // Only the first few cards are drawn (a page of thousands of cards is slow on a phone); "Show more" adds more.
+    const caps = ses().railCap || (ses().railCap = {}), cap = caps[sec.id] || 16, shown = sec.items.slice(0, cap);
+    const cards = shown.map((it, i) => card(it, sec.wide && i < sec.wide ? 'wide' : sec.compact ? 'compact' : '')).join('') + (sec.items.length > cap ? `<button class="card morecard" data-action="rail-more" data-id="${esc(sec.id)}"><b>Show ${Math.min(16, sec.items.length - cap)} more</b><span>${sec.items.length - cap} left in this row</span></button>` : '');
     return `<section class="section" aria-labelledby="h-${sec.id}"><div class="sec-head">${imageSlot(sec.image, 'thumb')}<div class="grow"><h2 id="h-${sec.id}">${esc(sec.title)}</h2>${sec.blurb ? `<p>${esc(sec.blurb)}</p>` : ''}</div>
       <div class="rail-nav"><button data-action="rail" data-dir="-1" data-target="rail-${sec.id}" aria-label="Scroll ${esc(sec.title)} back">${icon('left')}</button><button data-action="rail" data-dir="1" data-target="rail-${sec.id}" aria-label="Scroll ${esc(sec.title)} forward">${icon('right')}</button></div></div>
       <div class="rail" id="rail-${sec.id}" data-rail="${sec.id}">${cards}</div></section>`;
@@ -225,7 +232,7 @@
         <button class="fscan" data-action="search-now">${icon('refresh')} Look for new jobs</button></div>`;
       if (ses().q.trim()) {
         const res = KJ.search(JOBS, p, ses().q);
-        inner += `<div class="sec-head" style="margin-top:20px"><div class="grow"><h2>${A.plural(res.length, 'result')} for “${esc(ses().q.trim())}”</h2><p>Search covers every listing you haven’t dismissed.</p></div></div>${res.length ? `<div class="grid">${res.map((j) => card(j)).join('')}</div>` : emptyFeed('search')}`;
+        inner += `<div class="sec-head" style="margin-top:20px"><div class="grow"><h2>${A.plural(res.length, 'result')} for “${esc(ses().q.trim())}”</h2><p>Search covers every listing you haven’t dismissed.</p></div></div>${res.length ? `<div class="grid">${gridCards(res, 'search')}</div>` : emptyFeed('search')}`;
       } else if (ses().cat === 'For You') {
         const feed = KJ.buildFeed(JOBS, p, { newIds: ses().newIds });
         if (!feed.featured) inner += emptyFeed('feed');
@@ -236,7 +243,7 @@
       } else {
         const f = KJ.categoryFeed(JOBS, p, ses().cat);
         inner += imageSlot(CAT_IMAGE[ses().cat], 'banner');
-        inner += !f.featured ? emptyFeed('cat') : featuredCard(f.featured, ses().cat) + (f.rest.length ? `<section class="section"><div class="sec-head"><div class="grow"><h2>More in ${esc(ses().cat)}</h2><p>${A.plural(f.total, 'opportunity', 'opportunities')}, best matches first.</p></div></div><div class="grid">${f.rest.map((j) => card(j)).join('')}</div></section>` : '');
+        inner += !f.featured ? emptyFeed('cat') : featuredCard(f.featured, ses().cat) + (f.rest.length ? `<section class="section"><div class="sec-head"><div class="grow"><h2>More in ${esc(ses().cat)}</h2><p>${A.plural(f.total, 'opportunity', 'opportunities')}, best matches first.</p></div></div><div class="grid">${gridCards(f.rest, 'cat')}</div></section>` : '');
       }
     }
     return shell('discover', p && p.name ? `${g}, ${p.name}` : g, date, inner);

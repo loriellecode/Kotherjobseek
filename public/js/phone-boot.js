@@ -10,7 +10,9 @@
     await engineReady; init = init || {};
     const headers = {}; new Headers(init.headers || (typeof input === 'object' && input.headers) || {}).forEach((v, k) => { headers[k] = v; });
     let body = init.body; if (body instanceof Blob) body = await body.arrayBuffer();
+    const t0 = performance.now();
     const r = await window.KJ_PHONE.request((init.method || 'GET').toUpperCase(), p, headers, body);
+    try { if (localStorage.getItem('kj.debug')) console.log('[api] ' + (init.method || 'GET') + ' ' + p + ' ' + Math.round(performance.now() - t0) + 'ms'); } catch (_) { /* ignore */ }
     return new Response([204, 304].includes(r.status) ? null : r.body, { status: r.status, headers: r.headers });
   };
   // The résumé download link points at an API path; fetch it locally and save the file.
