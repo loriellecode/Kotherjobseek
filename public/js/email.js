@@ -1,4 +1,4 @@
-/* Job Email Assistant (client). The user always previews, edits and approves; nothing is ever sent by Kother.
+/* Job Email Assistant (client). The user always previews, edits and approves; nothing is ever sent by Jobgeek.
  * Output paths: formatted copy (HTML + plain on the clipboard), plain-text copy, mailto: (plain text only), and an unsent .eml draft. */
 (function () {
   'use strict';
@@ -22,7 +22,7 @@
         : ea.candidate ? `<p class="linknote caution">${icon('alert')}<span>The listing contains <b>${esc(ea.candidate)}</b>, but it doesn’t say that’s where applications go. Check the posting before using it.</span></p>` : `<p class="linknote caution">${icon('alert')}<span>The listing mentions applying by email, but no address was found. Enter the address from the original posting.</span></p>`}
       ${ea.wantsResume ? `<p class="note">The listing asks for a résumé — you’ll need to attach it yourself.</p>` : ''}${ea.wantsCoverLetter ? '<p class="note">It also asks for a cover letter.</p>' : ''}${ea.requiredSubject ? `<p class="note">Requested subject line: <b>${esc(ea.requiredSubject)}</b> (used automatically).</p>` : ''}
       <div class="actions"><button class="btn primary" data-action="email-open" data-id="${j.id}">${icon('mail')} ${high ? 'Email to Apply' : 'Prepare an email'}</button></div>
-      <p class="note">Kother helps you write the email. It never sends anything — you review it and send it yourself.</p></section>`;
+      <p class="note">Jobgeek helps you write the email. It never sends anything — you review it and send it yourself.</p></section>`;
   };
 
   /* ---------- assistant ---------- */
@@ -31,7 +31,7 @@
     const j = job(), caps = await A.emailCaps(), ea = j.emailApply || {};
     let d = null; try { d = (await A.api('GET', `/api/email/drafts/${j.id}`)).draft; } catch (_) { /* offline: start fresh */ }
     const aiOn = caps.ai.configured && localStorage.getItem('kj.emailAi') === '1', resume = A.S.resume && A.S.resume.resume;
-    A.openModal(`<div class="em"><h2 id="mt">Email assistant</h2><p class="sub">${esc(j.title)} — ${esc(j.employer)}. Kother never sends email: you review it, then send it yourself.</p>
+    A.openModal(`<div class="em"><h2 id="mt">Email assistant</h2><p class="sub">${esc(j.title)} — ${esc(j.employer)}. Jobgeek never sends email: you review it, then send it yourself.</p>
       ${ea.instructions ? `<details class="how" open><summary>What the listing says about applying</summary><p class="quote">“${esc(ea.instructions)}”</p></details>` : ''}
       <div class="em-grid"><div class="em-form">
         <div class="field"><label for="em-to">To</label><input id="em-to" type="email" inputmode="email" autocomplete="off" placeholder="recipient@employer.org" value="${esc(d ? d.to : ea.address || '')}"><span class="note" id="em-to-note"></span></div>
@@ -44,15 +44,15 @@
           <button class="btn" data-action="em-run" data-act="write">${icon('pencil')} Write an email for me</button><button class="btn" data-action="em-run" data-act="grammar">Correct grammar and punctuation</button>
           <button class="btn" data-action="em-run" data-act="professional">Make this sound more professional</button><button class="btn" data-action="em-run" data-act="shorter">Make it shorter and clearer</button>
           <button class="btn" data-action="em-run" data-act="tailor">Tailor it to this job</button><button class="btn" data-action="em-run" data-act="followup">Write a polite follow-up email</button></div>
-        ${caps.ai.configured ? `<label class="check aiswitch"><input type="checkbox" id="em-ai" ${aiOn ? 'checked' : ''}> Use AI to write and polish (optional)</label><details class="how"><summary>What gets sent if I turn AI on?</summary><p class="note">${esc(caps.ai.disclosure)}</p></details>` : '<p class="note">Using Kother’s built-in editor. (AI writing isn’t set up on this server; the built-in editor fixes grammar, tone and structure and drafts from your confirmed profile.)</p>'}
+        ${caps.ai.configured ? `<label class="check aiswitch"><input type="checkbox" id="em-ai" ${aiOn ? 'checked' : ''}> Use AI to write and polish (optional)</label><details class="how"><summary>What gets sent if I turn AI on?</summary><p class="note">${esc(caps.ai.disclosure)}</p></details>` : '<p class="note">Using Jobgeek’s built-in editor. (AI writing isn’t set up on this server; the built-in editor fixes grammar, tone and structure and drafts from your confirmed profile.)</p>'}
         <div id="em-status" class="em-status" role="status" aria-live="polite"></div><div id="em-warnings"></div>
         <div class="em-tabs" role="tablist"><button role="tab" data-action="em-tab" data-tab="formatted" aria-selected="true" id="tab-f">Preview</button><button role="tab" data-action="em-tab" data-tab="plain" aria-selected="false" id="tab-p">Plain text</button></div>
         <div id="em-preview" class="em-preview" aria-live="off"></div>
       </div></div>
       <div class="em-send"><h3 class="used-h">Before you send</h3><ul class="em-check"><li>Read it through and make any changes you like.</li><li id="ck-ph">Fill in anything shown in [square brackets].</li>
-        ${ea.wantsResume ? `<li><b>Attach your résumé.</b> This listing asks for it — Kother can’t attach files. ${resume ? `<a href="/api/resume/file" download>Download your résumé</a>` : '<a href="#/profile" data-action="close-modal">Upload a résumé in your profile first</a>'}</li>` : ''}${ea.wantsCoverLetter ? '<li><b>Attach your cover letter</b> (requested in the listing).</li>' : ''}</ul>
+        ${ea.wantsResume ? `<li><b>Attach your résumé.</b> This listing asks for it — Jobgeek can’t attach files. ${resume ? `<a href="/api/resume/file" download>Download your résumé</a>` : '<a href="#/profile" data-action="close-modal">Upload a résumé in your profile first</a>'}</li>` : ''}${ea.wantsCoverLetter ? '<li><b>Attach your cover letter</b> (requested in the listing).</li>' : ''}</ul>
         <div class="em-buttons"><button class="btn primary" data-action="em-copy">${icon('copy')} Copy email</button><button class="btn" data-action="em-copy-text">Copy as plain text</button><a class="btn" id="em-mailto" href="mailto:" data-action="em-mailto">${icon('mail')} Open in email app</a><button class="btn" data-action="em-eml">Download draft (.eml)</button></div>
-        <details class="how"><summary>How formatting is handled</summary><p class="note"><b>Copy email</b> puts the formatted version on your clipboard, so bold survives when you paste into the body of Gmail, Outlook, Apple Mail and most email apps. <b>Open in email app</b> uses a <code>mailto:</code> link, which can only carry plain text — bold can’t pass through it, so the plain-text version is used (no symbols like ** appear). <b>Download draft (.eml)</b> opens as an unsent message with bold in Outlook and Apple Mail; Gmail on the web can’t open .eml files. Kother never attaches files or sends anything.</p></details>
+        <details class="how"><summary>How formatting is handled</summary><p class="note"><b>Copy email</b> puts the formatted version on your clipboard, so bold survives when you paste into the body of Gmail, Outlook, Apple Mail and most email apps. <b>Open in email app</b> uses a <code>mailto:</code> link, which can only carry plain text — bold can’t pass through it, so the plain-text version is used (no symbols like ** appear). <b>Download draft (.eml)</b> opens as an unsent message with bold in Outlook and Apple Mail; Gmail on the web can’t open .eml files. Jobgeek never attaches files or sends anything.</p></details>
         <div class="em-foot"><button class="btn quiet sm" data-action="em-undo" id="em-undo" disabled>Undo last change</button><button class="btn quiet sm danger" data-action="em-delete-draft">Delete saved draft</button><button class="btn" data-action="close-modal">Close</button></div></div></div>`);
     const body = $('em-body'); body.addEventListener('paste', (e) => { e.preventDefault(); const t = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, t); });
     for (const id of ['em-to', 'em-subject', 'em-notes']) $(id).addEventListener('input', onEdit); body.addEventListener('input', onEdit);

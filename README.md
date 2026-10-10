@@ -1,4 +1,4 @@
-# Kother — personalized, editorial job discovery
+# Jobgeek — personalized, editorial job discovery
 
 An Apple News–inspired feed that finds **real** current job listings through permitted APIs/feeds, matches them transparently
 against a profile you control, and re-scans automatically whenever the profile changes.
@@ -41,7 +41,7 @@ With a `PEXELS_API_KEY` the app uses Pexels photos (credited). Without one it us
 Listings are not “verified/unverified”. Each gets one of five graded statuses with the reasons, evidence and time checked (open **Why this status** on a job): **Trusted source** (government/school/university site, the employer’s own careers feed, or an established job platform), **Application destination checked** (a recognised applicant-tracking system such as Workday, Greenhouse or Lever, or an address consistent with the employer), **Needs a closer look** (employer connection not confirmed — still shown), **High risk** (look-alike addresses, shorteners, IP/local hosts, sensitive-data requests — the apply action is hidden), **Blocked** (unsafe schemes, embedded credentials, upfront-payment requests — quarantined, not shown). Recognised names are evidence, not a pass, and nothing is ever described as guaranteed or fully verified.
 * **Automated:** URL validation/normalisation, look-alike and impersonation patterns, listing-text patterns (fees, gift cards, Social Security/bank requests, private-messaging, implausible pay), expiry dates, support from other sources listing the same job, and — on **Re-check** — a guarded fetch of the application page (public addresses only, ≤3 re-validated redirects, 200 KB, text only, never executed).
 * **Not done:** confirming the employer exists in a business registry, reputation services (e.g. Google Safe Browsing), and checking whether the employer’s own website lists the job. Set `TRUST_NETWORK_CHECKS=false` to disable live page checks.
-* Kother never submits an application or sends anything for you.
+* Jobgeek never submits an application or sends anything for you.
 
 ## Job Email Assistant
 For listings that apply by email: write, correct, professionalise, shorten, tailor, and follow-up drafts from your *confirmed* profile only (placeholders for anything missing). It **never sends email** — copy it, open it in your email app (`mailto:`, plain text), or download an `.eml` draft. Optional AI wording needs `ANTHROPIC_API_KEY` (and per-request consent); without it the built-in editor is used. Not yet tested against the live Anthropic API.

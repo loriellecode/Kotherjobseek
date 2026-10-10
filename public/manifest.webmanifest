@@ -1,6 +1,6 @@
 {
-  "name": "Kother — Job Search",
-  "short_name": "Job Search",
+  "name": "Jobgeek",
+  "short_name": "Jobgeek",
   "description": "Personalized job search. Your information stays on this device.",
   "start_url": "./",
   "scope": "./",

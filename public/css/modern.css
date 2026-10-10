@@ -273,3 +273,13 @@ body::before { background: linear-gradient(170deg, #241bb5 0%, #3541d8 100%); he
 .fscan { grid-column: 1 / -1; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 18px; font: 700 16px var(--sans); color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 14px; cursor: pointer; }
 @media (min-width: 760px) { .fscan { grid-column: auto; } }
 .topbar { padding-bottom: 6px; }
+
+/* ---------- Black and white base (indigo stays only for buttons and highlights) ---------- */
+:root { --bg: #ffffff; --surface: #ffffff; --surface-2: #f1f1f4; --line: #d4d4dc; --ink: #000000; --muted: #3d3d4a; --accent-soft: #ebe9fc; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #000000; --surface: #111114; --surface-2: #1c1c22; --line: #34343c; --ink: #ffffff; --muted: #d0d0da; } }
+:root[data-theme="dark"] { --bg: #000000; --surface: #111114; --surface-2: #1c1c22; --line: #34343c; --ink: #ffffff; --muted: #d0d0da; }
+body::before { background: #000000; }
+.dock { background: rgba(255, 255, 255, .94); border-color: #ffffff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dock { background: rgba(24, 24, 28, .96); border-color: #34343c; } }
+.card, .filterbar { box-shadow: 0 0 0 1px var(--line); }
+.fsel select { background-color: var(--surface-2); }

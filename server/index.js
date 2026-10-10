@@ -243,7 +243,7 @@ function start(opts = {}) {
   }));
 }
 if (require.main === module) start({ host: process.env.HOST || '0.0.0.0' }).then(({ port }) => {
-  console.log(`Kother job discovery listening on port ${port}`);
+  console.log(`Jobgeek job discovery listening on port ${port}`);
   for (const p of providers) { const c = p.configured(); console.log(`  source ${p.name}: ${c.ok ? 'configured' : 'NOT configured — missing ' + c.missing.join(', ')}`); }
   console.log(`  imagery (Pexels): ${imagery.status().configured ? 'configured' : 'not configured'}; web push: ${notify.pushStatus().configured ? 'configured' : 'not configured'}`);
 });

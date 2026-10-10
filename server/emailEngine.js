@@ -220,7 +220,7 @@ function review(blocks, ctx) {
   claim(/\bbachelor(?:'s)?\b[^.]{0,30}/i, 'degree', f.education);
   const bolds = E.boldRuns(blocks); if (bolds.length > 3) warnings.push({ level: 'info', code: 'bold', msg: 'There’s a lot of bold text. Keep bold for one or two key details so the email stays professional.' });
   if (!ctx.to) warnings.push({ level: 'warn', code: 'recipient', msg: ctx.email && ctx.email.mentionsEmail ? 'The listing mentions email, but no address was found. Enter the address from the posting.' : 'Enter the recipient’s email address.' }); else if (!E.emailValid(ctx.to)) warnings.push({ level: 'error', code: 'recipient-invalid', msg: 'That recipient address doesn’t look valid.' });
-  if (ctx.email && ctx.email.wantsResume) warnings.push({ level: 'info', code: 'attach-resume', msg: 'This listing asks for a résumé. Attach your résumé file yourself before sending — Kother can’t attach it for you.' });
+  if (ctx.email && ctx.email.wantsResume) warnings.push({ level: 'info', code: 'attach-resume', msg: 'This listing asks for a résumé. Attach your résumé file yourself before sending — Jobgeek can’t attach it for you.' });
   if (ctx.email && ctx.email.wantsCoverLetter) warnings.push({ level: 'info', code: 'attach-cover', msg: 'This listing also asks for a cover letter. Attach it before sending.' });
   if (f.unconfirmed) warnings.push({ level: 'info', code: 'unconfirmed', msg: `${f.unconfirmed} item${f.unconfirmed === 1 ? '' : 's'} in your profile ${f.unconfirmed === 1 ? 'is' : 'are'} still unconfirmed, so ${f.unconfirmed === 1 ? 'it was' : 'they were'} left out of this draft.` });
   return warnings;

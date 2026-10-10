@@ -66,7 +66,7 @@
       const upd = () => { if (prev) { prev.disabled = rail.scrollLeft < 4; next.disabled = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 4; } };
       rail.addEventListener('scroll', upd, { passive: true }); upd();
     });
-    document.title = r === 'job' && A.job(arg) ? `${A.job(arg).title} — Kother` : 'Kother — Job Discovery';
+    document.title = r === 'job' && A.job(arg) ? `${A.job(arg).title} — Jobgeek` : 'Jobgeek';
     hydrateImages();
   };
 
@@ -181,6 +181,7 @@
     const t = e.target;
     if (t.id === 'file-in') importFile(t.files[0]), (t.value = '');
     else if (t.dataset.action === 'filter') { if (t.dataset.key === 'cat') { ses.cat = t.value; ses.q = ''; A.render(); } else { ses[t.dataset.key] = t.value; A.render(true); } }
+    else if (t.dataset.action === 'textsize') { try { localStorage.setItem('kj.text', t.value); } catch (_) { /* ignore */ } applyText(); A.render(true); }
     else if (t.dataset.action === 'theme') { try { localStorage.setItem('kj.theme', t.value); } catch (_) { /* ignore */ } applyTheme(); }
     else if (t.dataset.action === 'resume-pick' && t.files[0]) jobAction(async () => {
       const f = t.files[0]; t.value = ''; A.setBusy('Uploading and reading your résumé');
