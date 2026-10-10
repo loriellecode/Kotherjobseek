@@ -201,3 +201,61 @@ body::before { content: ""; position: absolute; z-index: -1; left: 0; right: 0; 
 .card.career { cursor: pointer; } .card.career .more { font-size: 13px; font-weight: 700; color: var(--accent); white-space: nowrap; }
 .card.career .foot { flex-wrap: wrap; gap: 6px; } .card.career h3 { -webkit-line-clamp: 3; }
 .sheet h4 { margin: 14px 0 4px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); } .sheet ul { margin: 0 0 6px; padding-left: 20px; }
+
+/* =====================================================================================================
+   Easy reading (for people with a reading disability, low vision or tired eyes). Loaded last so it wins.
+   - A wide, clear sans-serif; no serif display faces, no italics, no ALL-CAPS, no letter-spaced labels
+   - Generous line and word spacing, left-aligned, short lines; nothing smaller than 14px of text; strong contrast
+   - A visible "Aa" button in the top bar makes all text larger (normal / large / extra large)
+   ===================================================================================================== */
+:root { --sans: "Atkinson Hyperlegible", Verdana, "Segoe UI", "Trebuchet MS", system-ui, sans-serif; --serif: var(--sans); --muted: #464a6b; --line: #c9cdea; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --muted: #c4c7ee; } }
+:root[data-theme="dark"] { --muted: #c4c7ee; }
+body, button, input, select, textarea { font-family: var(--sans); }
+body { line-height: 1.6; letter-spacing: .012em; word-spacing: .08em; font-size: 17px; }
+em, i, cite, address { font-style: normal; }
+p, li, dd, .note, .meta, .blurb { line-height: 1.6; max-width: 68ch; text-align: left; hyphens: none; }
+* { text-transform: none !important; } /* no ALL-CAPS anywhere */
+.eyebrow, .flabel, .catlabel, .hero-eyebrow, .seg button, .sheet h4, .dt, dt, .chip-over, .badge-new, .tags, .used-h, .art .wm { letter-spacing: .01em !important; }
+.eyebrow, .flabel, .hero-eyebrow, .sheet h4, dt { font-size: 15px !important; font-weight: 700; color: inherit; }
+.catlabel { font-size: 15px; font-weight: 700; }
+h1, h2, h3, h4 { line-height: 1.28; letter-spacing: 0; text-wrap: balance; }
+h1.page { font-size: clamp(30px, 6vw, 46px); }
+.card h3, .card.wide h3 { font: 700 20px/1.3 var(--sans); letter-spacing: 0; }
+.hero h2 { font-family: var(--sans); font-weight: 800; line-height: 1.12; letter-spacing: 0; }
+.card .employer { font-size: 15px; font-weight: 700; } .card .meta, .card .pay { font-size: 16px; } .card .pay { font-weight: 700; color: var(--ink); } .pay-alt { font-size: 15px; }
+.matchpill, .chip, .pillbtn, .btn, .seg button { font-size: 15px; font-weight: 700; }
+.btn, .chip, .pillbtn, .seg button, .dock-tab, .dock-icon { min-height: 44px; } /* easy-to-hit targets */
+.dock-aa { font: 800 16px var(--sans); letter-spacing: 0; width: 46px; }
+.note, .sub, .credit-line, .linknote, .reasons, .kv dd, .mini-kv dd { font-size: 15.5px; }
+.card .art .credit, .hero-credit, .credit { font-size: 12.5px; }
+.reasons li, .sheet li, .card ul li { margin: 6px 0; }
+.hero-eyebrow { opacity: 1; } .topbar .eyebrow { opacity: 1; font-size: 16px !important; }
+.hero-sub, .hero-meta { font-size: 18px; line-height: 1.5; } .hero .btn { font-size: 17px; }
+.hero-shade { background: linear-gradient(0deg, rgba(8, 8, 24, .9) 0%, rgba(8, 8, 24, .68) 48%, rgba(8, 8, 24, .35) 100%); }
+body::before { background: radial-gradient(520px 220px at 12% 18%, rgba(255,255,255,.12), transparent 70%), linear-gradient(160deg, #241bb5 0%, #3541d8 70%, #4a57e6 100%); }
+a { text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.hero :focus-visible, .band :focus-visible { outline-color: #fff; }
+/* text size: Aa button */
+:root[data-text="large"] #app, :root[data-text="large"] #modal-root, :root[data-text="large"] #toast-root { zoom: 1.14; }
+:root[data-text="xlarge"] #app, :root[data-text="xlarge"] #modal-root, :root[data-text="xlarge"] #toast-root { zoom: 1.3; }
+/* phone: keep text readable — compact the layout, not the words (replaces the earlier 84% scale-down) */
+@media (max-width: 560px) {
+  #app, #modal-root, #toast-root { zoom: 1; }
+  :root[data-text="large"] #app, :root[data-text="large"] #modal-root, :root[data-text="large"] #toast-root { zoom: 1.12; }
+  :root[data-text="xlarge"] #app, :root[data-text="xlarge"] #modal-root, :root[data-text="xlarge"] #toast-root { zoom: 1.25; }
+  body { font-size: 16px; }
+  .chip { height: 40px; font-size: 15px; padding: 0 14px; } .flabel { font-size: 15px !important; margin-top: 12px; } .seg button { height: 40px; font-size: 14px; padding: 0 12px; } .pillbtn { height: 42px; font-size: 15px; }
+  .card h3, .card.wide h3 { font-size: 18px; } .card .employer { font-size: 14px; } .card .meta, .card .pay { font-size: 15px; }
+  .matchpill { font-size: 14px; padding: 6px 10px; } .hero h2 { font-size: 28px; } .hero-sub { font-size: 16px; } .hero-meta { font-size: 15px; }
+  .dock-tab { font-size: 15px; padding: 0 8px; height: 42px; } .dock-icon { width: 40px; height: 42px; } .dock-aa { width: 40px; font-size: 15px; }
+}
+@media (max-width: 560px) {
+  .dock { flex-wrap: wrap; justify-content: center; row-gap: 2px; border-radius: 28px; overflow: visible; }
+  .dock-sep { display: none; }
+  .dock > .dock-icon, .dock > .tools, .dock > a.dock-icon[href="#/settings"] { display: inline-grid !important; }
+  .dock .tools { display: inline-block !important; }
+  body::before { height: 300px; }
+}
+@media (max-width: 560px) { body::before { height: 345px; } }

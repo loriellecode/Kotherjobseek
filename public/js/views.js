@@ -129,6 +129,7 @@
       <span class="dock-sep" aria-hidden="true"></span>
       <button class="dock-icon" data-action="toggle-search" aria-label="Search jobs" aria-expanded="${!!searchOpen}">${icon('search')}</button>
       <div class="tools"><button class="dock-icon" data-action="notes" aria-label="Notifications${unread ? ` (${unread} unread)` : ''}" aria-expanded="${ses().notesOpen}">${icon('bell')}${unread ? '<span class="dot"></span>' : ''}</button>${pop}</div>
+      <button class="dock-icon dock-aa" data-action="text-size" aria-label="Change text size (now ${esc(textSize())})" title="Text size">Aa</button>
       <a class="dock-icon" href="#/settings" aria-label="Settings">${icon('gear')}</a></nav></header>
       <main id="main">
       ${searchOpen ? `<form class="searchbar" role="search" data-form="search"><label class="sr" for="q">Search jobs</label>${icon('search')}<input id="q" type="search" placeholder="Search jobs, employers, cities" value="${esc(ses().q)}" autocomplete="off" enterkeyhint="search">${ses().q ? `<button type="button" class="clear" data-action="clear-search" aria-label="Clear search">${icon('x')}</button>` : ''}</form>` : ''}
@@ -160,6 +161,7 @@
   };
   const bullets = (arr) => `<ul>${arr.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`;
   /* A career card is a short summary; tapping it opens everything (what the job is, why it may be relevant, skills, pay, gaps). */
+  const textSize = () => { try { return localStorage.getItem('kj.text') || 'normal'; } catch (_) { return 'normal'; } };
   function careerCard(c) {
     const inc = c.state === 'include', st = c.stats, { pay, geo } = careerStats(c);
     const short = st && st.salary ? `${KJ.fmtMoney(st.salary.low)}–${KJ.fmtMoney(st.salary.high)}/yr` : '';

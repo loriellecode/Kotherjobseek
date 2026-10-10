@@ -157,7 +157,7 @@
       'prop-resolve': () => run(() => decide(id, 'accept', Object.assign({ mode: t.dataset.mode }, A.session.pendingEdit ? { data: A.session.pendingEdit } : {}))),
       'prop-accept-all': () => run(async () => { for (const p of S.resume.proposals.filter((x) => x.origin === 'stated' && !x.conflict && !x.data.flag && x.kind !== 'cert')) { const r = await A.api('POST', `/api/resume/proposals/${p.id}/accept`, {}); S.resume = { resume: r.resume, proposals: r.proposals }; S.profile = r.profile; S.status = r.status; } A.pollStatus(); A.render(true); A.editors.resumeReview(S.resume, 'Added. Your searches are being expanded.'); }),
       'resume-finish': () => run(async () => { const r = await A.api('POST', '/api/resume/finish'); S.resume = await A.api('GET', '/api/resume'); A.closeModal(); A.render(true); A.toast(r.message); if (r.searchExpanded) A.pollStatus(); }),
-      'career-open': () => A.careerDetail(t.dataset.id), 'career-state': () => run(async () => { const r = await A.api('PUT', `/api/careers/${id}`, { state: t.dataset.state }); S.careers = r; S.status = r.status; A.pollStatus(); A.render(true); A.toast(t.dataset.state === 'include' ? 'Included. Searching for these roles…' : t.dataset.state === 'exclude' ? 'Hidden, and left out of future searches.' : 'Restored.'); }),
+      'text-size': () => { const order = ['normal', 'large', 'xlarge'], cur = (() => { try { return localStorage.getItem('kj.text') || 'normal'; } catch (_) { return 'normal'; } })(), next = order[(order.indexOf(cur) + 1) % 3]; try { localStorage.setItem('kj.text', next); } catch (_) { /* ignore */ } applyText(); A.render(true); A.toast('Text size: ' + { normal: 'normal', large: 'large', xlarge: 'extra large' }[next]); }, 'career-open': () => A.careerDetail(t.dataset.id), 'career-state': () => run(async () => { const r = await A.api('PUT', `/api/careers/${id}`, { state: t.dataset.state }); S.careers = r; S.status = r.status; A.pollStatus(); A.render(true); A.toast(t.dataset.state === 'include' ? 'Included. Searching for these roles…' : t.dataset.state === 'exclude' ? 'Hidden, and left out of future searches.' : 'Restored.'); }),
       'career-view': () => { ses.q = t.dataset.q; ses.cat = 'For You'; A.render(); window.scrollTo(0, 0); },
       'int-add': () => document.getElementById('ints').insertAdjacentHTML('beforeend', A.intRow({})), 'int-rm': () => t.closest('.irow').remove(),
       untrack: () => run(async () => { await A.api('DELETE', `/api/applications/${id}`); delete S.apps[id]; A.closeModal(); A.render(true); A.toast('Stopped tracking this job.'); }),
@@ -256,6 +256,8 @@
     if (sub) { await A.api('DELETE', '/api/push/subscribe', { endpoint: sub.endpoint }); await sub.unsubscribe(); } A.toast('Push is off for this device.');
   }
 
+  function applyText() { let t = 'normal'; try { t = localStorage.getItem('kj.text') || 'normal'; } catch (_) { /* ignore */ } document.documentElement.setAttribute('data-text', t); }
+  applyText();
   function applyTheme() { let t = 'auto'; try { t = localStorage.getItem('kj.theme') || 'auto'; } catch (_) { /* ignore */ } if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t); }
 
   /* ---------- boot ---------- */
