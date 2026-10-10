@@ -4,7 +4,19 @@
  * The file contains public job listings only — nothing about the person using the app. */
 const { ProviderError } = require('./util');
 
+/* After the list is read, listings that are no longer in it are closed (kept only if she saved or applied to them), so removed or old
+ * listings — including anything from an earlier version of the list — never linger on her phone. */
+function reconcile(db, listings) {
+  const keep = new Set(listings.map((l) => String(l.externalId)));
+  const rows = db.prepare("SELECT id, external_id FROM jobs WHERE provider='static' AND status!='closed'").all();
+  const gone = rows.filter((r) => !keep.has(String(r.external_id))); if (!gone.length) return 0;
+  const up = db.prepare("UPDATE jobs SET status='closed' WHERE id=?");
+  db.exec('BEGIN'); try { for (const r of gone) up.run(r.id); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
+  return gone.length;
+}
+
 module.exports = {
+  reconcile,
   id: 'static', name: 'Daily job list', kind: 'feed', docs: 'See README → “Phone edition”.',
   setup: ['The list is refreshed by the “Publish app” GitHub workflow (needs ADZUNA_APP_ID / ADZUNA_APP_KEY and/or USAJOBS_API_KEY / USAJOBS_USER_EMAIL as repository secrets).'],
   budget: () => 1000000,

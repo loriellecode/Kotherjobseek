@@ -38,4 +38,11 @@ t.describe('phone edition: daily job list', () => {
       globalThis.fetch = async () => ({ ok: false, status: 404 }); await assert.rejects(staticProvider.search(), /not published yet/);
     } finally { globalThis.fetch = real; delete globalThis.__KJ_JOBS_URL; }
   });
+  t.it('listings that drop out of the list (or came from an older list) are closed on the phone', () => {
+    const { open } = require('../server/db'), { upsertJob } = require('../server/jobs'), db = open(':memory:');
+    const mk = (id) => normalizeListing({ externalId: id, title: 'Budget Analyst ' + id, employer: 'Test County', city: 'Stockton', state: 'California', description: 'Prepare budgets and reports for the county department.', applyUrl: 'https://www.adzuna.com/details/' + id }, 'static', Date.now());
+    for (const id of ['sample:1', 'adzuna:1', 'adzuna:2']) upsertJob(db, mk(id));
+    assert.equal(staticProvider.reconcile(db, [{ externalId: 'adzuna:2' }]), 2);
+    assert.deepEqual(db.prepare("SELECT external_id FROM jobs WHERE status!='closed'").all().map((r) => r.external_id), ['adzuna:2']);
+  });
 });

@@ -24,13 +24,16 @@ const outFile = process.argv[2] || 'jobs.json';
   pipeline.enqueue(id, { classes: ['broad', 'location'], reason: 'manual', force: true, search: true }); await pipeline.drain();
   pipeline.enqueue(id, { classes: ['resume'], reason: 'manual', force: true, search: true }); await pipeline.drain(); // second, wider pass
   const err = db.prepare("SELECT error FROM tasks WHERE status='failed' ORDER BY id DESC LIMIT 1").get(); if (err) console.warn('::warning::' + err.error);
-  const rows = db.prepare("SELECT * FROM jobs WHERE status='active' ORDER BY published DESC").all();
+  // Keep the best matches for the starter profile (pay at or above her minimum, requirements met for far areas). A phone has to read and re-score
+  // every listing it is given, so a focused list loads far faster than thousands of listings that would be hidden anyway.
+  const cap = Number(process.env.JOBS_CAP) || 700;
+  const rows = db.prepare("SELECT jb.* FROM jobs jb JOIN matches m ON m.job_id=jb.id AND m.user_id=? WHERE jb.status='active' AND m.excluded=0 ORDER BY m.overall DESC, jb.published DESC LIMIT ?").all(id, cap * 2);
   const jobs = [];
   for (const r of rows) {
     if (!KJ.inSearchStates({ state: r.state, locationText: r.location_text, city: r.city, remote: !!r.remote })) continue; // California only
     if (r.trust_status === 'blocked') continue; // quarantined listings are never published
     jobs.push({ externalId: `${r.provider}:${r.external_id}`, title: r.title, employer: r.employer, locationText: r.location_text, city: r.city, state: r.state, lat: r.lat, lon: r.lon, remote: !!r.remote, arrangement: r.arrangement, salaryMin: r.salary_min, salaryMax: r.salary_max, salaryPeriod: r.salary_period, salaryEstimated: !!r.salary_estimated, compNote: r.comp_note, type: r.employment_type, description: r.description, summary: r.summary, applyUrl: r.apply_url, published: r.published, deadline: r.deadline, logoUrl: r.logo_url });
-    if (jobs.length >= 3000) break;
+    if (jobs.length >= cap) break;
   }
   fs.writeFileSync(outFile, JSON.stringify(Object.assign(meta, { count: jobs.length, jobs })));
   console.log(`Wrote ${jobs.length} California listings from ${meta.sources.join(', ')} to ${outFile}`);

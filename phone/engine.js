@@ -36,6 +36,8 @@ async function boot() {
   if (!u) { const id = Number(db.prepare('INSERT INTO users(email,pw_hash,created_at) VALUES(?,?,?)').run('me@this-phone.local', 'none', now()).lastInsertRowid); P.ensureProfile(db, id); const seeded = P.applyInitialProfile(db, id); if (seeded.applied) pipeline.enqueue(id, { classes: ['broad', 'location'], reason: 'profile', revision: seeded.revision }); u = { id }; first = true; }
   token = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
   db.prepare('INSERT OR REPLACE INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(H.sha256(token), u.id, Date.now() + 3650 * 864e5);
+  // A new published version (new job list) → re-read the list once now, so anything old on this phone is replaced straight away.
+  const lastBuild = await idbGet('build'); if (!first && lastBuild !== __KJ_BUILD__) pipeline.enqueue(u.id, { reason: 'manual', force: true, search: true }); idbSet('build', __KJ_BUILD__).catch(() => {});
   pipeline.start(); if (!first) pipeline.scheduleTick().catch(() => {}); setInterval(() => pipeline.scheduleTick().catch(() => {}), 30 * 60000);
   app = { handler: createApp(db, pipeline), db, pipeline, H };
   addEventListener('pagehide', () => { try { app.db.flush(); } catch (_) { /* ignore */ } });

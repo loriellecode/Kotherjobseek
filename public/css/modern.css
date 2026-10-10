@@ -285,3 +285,8 @@ body::before { background: #000000; }
 .fsel select { background-color: var(--surface-2); }
 /* header band: purple-blue like the other accents */
 body::before { background: radial-gradient(520px 220px at 12% 18%, rgba(255,255,255,.12), transparent 70%), linear-gradient(160deg, #2a1fc4 0%, #3b2fe0 55%, #5b45ec 100%); }
+
+/* Header band runs under the iPhone status bar (no white strip above it when installed on the home screen) */
+body::before { top: calc(-1 * env(safe-area-inset-top, 0px)); height: calc(300px + env(safe-area-inset-top, 0px)); }
+@media (max-width: 560px) { body::before { height: calc(345px + env(safe-area-inset-top, 0px)); } }
+html { background: var(--bg); }

@@ -26,7 +26,7 @@ const copy = (from, to) => fs.cpSync(from, to, { recursive: true });
   const sh = (f) => P('phone', 'shims', f);
   await esbuild.build({
     entryPoints: [P('phone', 'engine.js')], outfile: path.join(out, 'engine.js'), bundle: true, format: 'iife', platform: 'browser', target: ['es2022'], minify: true, legalComments: 'none', logLevel: 'warning',
-    inject: [sh('globals.js')], define: { __dirname: '"/app/server"', __filename: '"/app/server/index.js"', 'process.env.NODE_ENV': '"phone"' }, loader: { '.json': 'json' },
+    inject: [sh('globals.js')], define: { __KJ_BUILD__: JSON.stringify(String(Date.now())), __dirname: '"/app/server"', __filename: '"/app/server/index.js"', 'process.env.NODE_ENV': '"phone"' }, loader: { '.json': 'json' },
     alias: { 'node:fs': sh('fs.js'), fs: sh('fs.js'), 'node:path': 'path-browserify', path: 'path-browserify', 'node:crypto': sh('crypto.js'), crypto: sh('crypto.js'), 'node:sqlite': sh('sqlite.js'),
       'node:http': sh('empty.js'), http: sh('empty.js'), 'node:https': sh('empty.js'), https: sh('empty.js'), 'node:net': sh('empty.js'), net: sh('empty.js'), 'node:dns': sh('empty.js'), dns: sh('empty.js'), 'web-push': sh('empty.js'),
       url: sh('empty.js'), zlib: sh('empty.js'), stream: sh('empty.js'), canvas: sh('empty.js'), util: sh('empty.js'), os: sh('empty.js'), events: sh('empty.js'), 'pdf-parse/lib/pdf-parse.js': P('phone', '.generated', 'pdf-parse.js') },

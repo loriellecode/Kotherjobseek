@@ -120,6 +120,7 @@ class Pipeline {
             const r = upsertJob(this.db, n);
             if (r.created) { result.created++; fresh++; } else if (r.duplicate) result.duplicates++; else { result.updated++; if (r.changed.length) this.noteChange(userId, r.id, r.changed); }
           }
+          if (prov.reconcile) prov.reconcile(this.db, res.listings);
           this.db.prepare("UPDATE search_log SET status='ok', finished_at=?, result_count=?, new_count=? WHERE id=?").run(now(), res.listings.length, fresh, logId);
         } catch (e) {
           this.db.prepare("UPDATE search_log SET status='failed', finished_at=?, error=? WHERE id=?").run(now(), String(e.message).slice(0, 300), logId);
