@@ -27,7 +27,11 @@ module.exports = {
     let res; try { res = await fetch(url, { cache: 'no-cache' }); } catch (e) { throw new ProviderError('The daily job list could not be loaded. Check your connection and try again.'); }
     if (!res.ok) throw new ProviderError(`The daily job list is not published yet (HTTP ${res.status}). Run the “Publish app” workflow on GitHub with your job-search keys set.`);
     let data; try { data = await res.json(); } catch (_) { throw new ProviderError('The daily job list is not valid JSON.'); }
-    const jobs = (Array.isArray(data) ? data : data.jobs || []).filter((x) => x && x.externalId && x.title);
-    return { listings: jobs, total: jobs.length, generatedAt: data.generatedAt || null };
+    const all = (Array.isArray(data) ? data : data.jobs || []).filter((x) => x && x.externalId && x.title);
+    // The list is published in ranked batches (best matches first). The phone shows one batch at a time; “Look for new jobs” moves to the next.
+    const batches = Math.max(1, ...all.map((x) => Number(x.batch) || 1)); globalThis.__KJ_BATCHES = batches; try { localStorage.setItem('kj.batches', String(batches)); } catch (_) { /* storage unavailable */ }
+    let cur = Number(globalThis.__KJ_BATCH) || 1; if (cur > batches) cur = 1;
+    const jobs = all.filter((x) => (Number(x.batch) || 1) === cur);
+    return { listings: jobs, total: jobs.length, batch: cur, batches, generatedAt: data.generatedAt || null };
   },
 };

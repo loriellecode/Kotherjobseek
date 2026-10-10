@@ -34,6 +34,9 @@ Honest limits of the phone edition: data lives in that one browser/phone (cleari
 ## Los Angeles-area suburbs
 The starter profile also searches eight Los Angeles suburbs (Pasadena, Glendale, Burbank, Santa Clarita, Torrance, Long Beach, Santa Monica, Culver City). Editable under Profile → Location (“Also look in these areas”). Jobs there are shown **only** when the pay is listed and at least her minimum, and no required qualification is missing; otherwise they stay hidden. Everything is still California only.
 
+## “Look for new jobs” on the phone
+The published list holds the best ~2,100 matches in three ranked sets of 700. The phone shows one set at a time; each press of **Look for new jobs** swaps in the next set (jobs not shown yet; saved and applied jobs are kept). After the third set it starts over with the newest published list. The phone itself never searches live — new listings arrive when the list is refreshed (daily, once the Adzuna secrets are saved in GitHub).
+
 ## Photos
 With a `PEXELS_API_KEY` the app uses Pexels photos (credited). Without one it uses **your own free photos**: put `.jpg`/`.png`/`.webp` files in `public/photos/<topic>/` (topics: `finance`, `business`, `education`, `special-education`, `workforce`, `banking`, `remote-work`, `workplace`, `professional-development`, `career-growth`) or `public/photos/any/` for all topics, and credit them in `public/photos/credits.json`: `{ "finance/desk.jpg": { "photographer": "Name", "url": "https://…" } }`. A starter set of 12 free-to-use Unsplash photos (generic office, classroom and finance scenes) is bundled in `public/photos/` and credited as “an Unsplash contributor” — replace or add to them any time. The app never shows a photo as a picture of a specific employer.
 

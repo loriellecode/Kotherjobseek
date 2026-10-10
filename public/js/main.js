@@ -114,7 +114,7 @@
     const r = await A.api('PUT', `/api/applications/${id}`, { status: 'applied' }); S.apps[id] = r.application; ses.applyNote = ''; A.render(true);
     A.toast('Marked as applied. Nothing was sent to the employer — this is your own record.');
   }
-  async function searchNow() { const r = await A.api('POST', '/api/search/run'); S.status = r.status; A.renderBanners(); A.pollStatus(); A.toast('Search queued.'); }
+  async function searchNow() { const r = await A.api('POST', '/api/search/run'); S.status = r.status; A.renderBanners(); A.pollStatus(); A.toast(r.batch ? (r.batch.of > 1 ? (r.batch.wrapped ? `You’ve now seen every listing in this list. Starting over with the newest one — new jobs are added when the list is refreshed.` : `Showing the next set of jobs (set ${r.batch.n} of ${r.batch.of}).`) : 'Checking for new jobs.') : 'Search queued.'); }
 
   document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-action]');

@@ -26,15 +26,15 @@ const outFile = process.argv[2] || 'jobs.json';
   const err = db.prepare("SELECT error FROM tasks WHERE status='failed' ORDER BY id DESC LIMIT 1").get(); if (err) console.warn('::warning::' + err.error);
   // Keep the best matches for the starter profile (pay at or above her minimum, requirements met for far areas). A phone has to read and re-score
   // every listing it is given, so a focused list loads far faster than thousands of listings that would be hidden anyway.
-  const cap = Number(process.env.JOBS_CAP) || 700;
+  const batchSize = Number(process.env.BATCH_SIZE) || 700, cap = (Number(process.env.BATCHES) || 3) * batchSize;
   const rows = db.prepare("SELECT jb.* FROM jobs jb JOIN matches m ON m.job_id=jb.id AND m.user_id=? WHERE jb.status='active' AND m.excluded=0 ORDER BY m.overall DESC, jb.published DESC LIMIT ?").all(id, cap * 2);
   const jobs = [];
   for (const r of rows) {
     if (!KJ.inSearchStates({ state: r.state, locationText: r.location_text, city: r.city, remote: !!r.remote })) continue; // California only
     if (r.trust_status === 'blocked') continue; // quarantined listings are never published
-    jobs.push({ externalId: `${r.provider}:${r.external_id}`, title: r.title, employer: r.employer, locationText: r.location_text, city: r.city, state: r.state, lat: r.lat, lon: r.lon, remote: !!r.remote, arrangement: r.arrangement, salaryMin: r.salary_min, salaryMax: r.salary_max, salaryPeriod: r.salary_period, salaryEstimated: !!r.salary_estimated, compNote: r.comp_note, type: r.employment_type, description: r.description, summary: r.summary, applyUrl: r.apply_url, published: r.published, deadline: r.deadline, logoUrl: r.logo_url });
+    jobs.push({ batch: Math.floor(jobs.length / batchSize) + 1, externalId: `${r.provider}:${r.external_id}`, title: r.title, employer: r.employer, locationText: r.location_text, city: r.city, state: r.state, lat: r.lat, lon: r.lon, remote: !!r.remote, arrangement: r.arrangement, salaryMin: r.salary_min, salaryMax: r.salary_max, salaryPeriod: r.salary_period, salaryEstimated: !!r.salary_estimated, compNote: r.comp_note, type: r.employment_type, description: r.description, summary: r.summary, applyUrl: r.apply_url, published: r.published, deadline: r.deadline, logoUrl: r.logo_url });
     if (jobs.length >= cap) break;
   }
-  fs.writeFileSync(outFile, JSON.stringify(Object.assign(meta, { count: jobs.length, jobs })));
+  fs.writeFileSync(outFile, JSON.stringify(Object.assign(meta, { count: jobs.length, batchSize, batches: Math.max(1, Math.ceil(jobs.length / batchSize)), jobs })));
   console.log(`Wrote ${jobs.length} California listings from ${meta.sources.join(', ')} to ${outFile}`);
 })().catch((e) => { console.error('::error::' + e.message); process.exit(1); });

@@ -21,6 +21,7 @@ let app = null, token = '', ready = null;
 async function boot() {
   const SQL = await initSqlJs({ locateFile: () => url('sql-wasm-browser.wasm') });
   globalThis.__KJ_SQL = SQL; globalThis.__KJ_DB_BYTES = await idbGet('db'); globalThis.__KJ_PERSIST = (b) => { idbSet('db', b).catch(() => {}); };
+  try { globalThis.__KJ_BATCH = Number(localStorage.getItem('kj.batch')) || 1; } catch (_) { globalThis.__KJ_BATCH = 1; }
   globalThis.__KJ_JOBS_URL = url('jobs.json'); globalThis.__KJ_PDF_WORKER_SRC = url('pdf.worker.js'); globalThis.PDFJS = Object.assign(globalThis.PDFJS || {}, { workerSrc: url('pdf.worker.js') });
   // Files the server code expects to find on disk.
   const V = vfsMod.__vfs; vfsMod.mkdirSync('/app/config'); vfsMod.writeFileSync('/app/config/initial-profile.json', JSON.stringify(INITIAL_PROFILE));
@@ -67,6 +68,13 @@ globalThis.KJ_PHONE = {
     await this.ready();
     if (method === 'DELETE' && /\/api\/account$/.test(path)) { setTimeout(resetEverything, 50); return { status: 200, headers: { 'content-type': 'application/json' }, body: new TextEncoder().encode('{"ok":true}') }; }
     if (/\/api\/auth\/(logout|login|signup)$/.test(path)) return { status: 200, headers: { 'content-type': 'application/json' }, body: new TextEncoder().encode(JSON.stringify({ ok: true, user: { id: 1, email: 'me@this-phone.local' } })) };
+    if (method === 'POST' && /\/api\/search\/run$/.test(path)) { // "Look for new jobs": show the next batch (jobs not shown yet); after the last one, start again from the newest list
+      let total = 1; try { total = Number(localStorage.getItem('kj.batches')) || 1; } catch (_) { /* ignore */ }
+      const cur = Number(globalThis.__KJ_BATCH) || 1, next = total > 1 ? (cur % total) + 1 : 1, wrapped = total > 1 && next === 1;
+      globalThis.__KJ_BATCH = next; try { localStorage.setItem('kj.batch', String(next)); } catch (_) { /* ignore */ }
+      const o = await call(method, path, headers, body); let j = {}; try { j = JSON.parse(Buffer.concat(o.chunks).toString()); } catch (_) { /* ignore */ }
+      return { status: o.status, headers: o.headers, body: new TextEncoder().encode(JSON.stringify(Object.assign(j, { batch: { n: next, of: total, wrapped } }))) };
+    }
     const out = await call(method, path, headers, body);
     return { status: out.status, headers: out.headers, body: out.chunks.length ? new Uint8Array(Buffer.concat(out.chunks)) : new Uint8Array(0) };
   },

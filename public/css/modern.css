@@ -290,3 +290,19 @@ body::before { background: radial-gradient(520px 220px at 12% 18%, rgba(255,255,
 body::before { top: calc(-1 * env(safe-area-inset-top, 0px)); height: calc(300px + env(safe-area-inset-top, 0px)); }
 @media (max-width: 560px) { body::before { height: calc(345px + env(safe-area-inset-top, 0px)); } }
 html { background: var(--bg); }
+
+/* Paint the top safe-area (under the clock/battery) the same purple-blue as the header band */
+html { background: linear-gradient(#2a1fc4, #2a1fc4) top / 100% env(safe-area-inset-top, 0px) no-repeat, var(--bg); }
+
+/* Thinner top bar on phones: one row of four tabs + search + bell (Settings moves to the Profile page), sitting higher */
+.sm-only, .phone-only { display: none; }
+@media (max-width: 560px) {
+  .sm-only { display: inline; } .dock-tab .lg { display: none; } .phone-only { display: block; }
+  .dock-wrap { padding-top: calc(4px + env(safe-area-inset-top, 0px)); padding-bottom: 2px; }
+  .dock { flex-wrap: nowrap; justify-content: space-between; border-radius: 999px; padding: 3px; overflow: hidden; }
+  .dock > a.dock-icon[href="#/settings"] { display: none !important; }
+  .dock-tab { padding: 0 8px; height: 38px; font-size: 15px; }
+  .dock .dock-icon { width: 34px; height: 38px; }
+  .topbar { padding-top: 4px; }
+  body::before { height: calc(250px + env(safe-area-inset-top, 0px)); }
+}
