@@ -18,7 +18,7 @@ function rematchUser(db, userId) {
     let strong = 0;
     for (const row of rows) {
       const ev = KJ.evaluate(jobView(row, t), profile, { resumeText });
-      up.run(userId, row.id, base.revision, ev.classification, ev.overall, ev.excluded.belowFloor ? 1 : 0, JSON.stringify(ev), t);
+      up.run(userId, row.id, base.revision, ev.classification, ev.overall, (ev.excluded.belowFloor || ev.excluded.farArea) ? 1 : 0, JSON.stringify(ev), t);
       if (ev.classification === 'strong') strong++;
     }
     return { count: rows.length, strong, revision: base.revision };

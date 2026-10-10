@@ -36,9 +36,12 @@ function planSearches(profile, provider, cap, careers) {
   const wantsOnsite = modes.includes('onsite') || modes.includes('hybrid') || !modes.length;
   const wantsRemote = modes.includes('remote');
   const share = (wantsRemote ? 0.6 : 1) * (profile.statewide ? 0.75 : 1);
-  const perCity = cities.length ? Math.max(2, Math.floor((cap * share) / cities.length)) : 0;
+  const far = (profile.farAreas || []).map((c) => c.replace(/,?\s*(CA|California)$/i, ', CA')).slice(0, 8), farBudget = far.length ? Math.min(far.length * 2, Math.floor(cap * 0.2)) : 0;
+  const perCity = cities.length ? Math.max(2, Math.floor(((cap - farBudget) * share) / cities.length)) : 0;
   if (wantsOnsite || !wantsRemote) for (const city of cities) titles.slice(0, perCity).forEach((t) => q.push({ what: t, where: city.replace(/,?\s*(CA|California)$/i, ', CA'), radiusMiles: radius, remote: false }));
   if (profile.statewide) titles.slice(0, Math.max(3, Math.floor(cap * 0.2))).forEach((t) => q.push({ what: t, where: 'California', radiusMiles: 0, remote: false }));
+  // Extra areas (e.g. Los Angeles suburbs): a small reserved share of the plan, searched after the home area and California-wide.
+  for (const city of far) titles.slice(0, 2).forEach((t) => { if (q.length < cap) q.push({ what: t, where: city, radiusMiles: 8, remote: false }); });
   if (wantsRemote) titles.slice(0, Math.max(3, cap - q.length)).forEach((t) => q.push({ what: `${t} remote`, where: 'California', radiusMiles: 0, remote: true }));
   return q.slice(0, cap).map((x) => Object.assign(x, { key: [KJ.norm(x.what), KJ.norm(x.where), x.radiusMiles].join('|') }));
 }

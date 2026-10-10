@@ -220,6 +220,10 @@
     if (unmet.length) classification = 'needs_more';
     else if (qLevel === 'strong' && align.score >= 40 && location.status !== 'outside' && location.status !== 'not_preferred') classification = 'strong';
 
+    // Extra areas far from home (e.g. Los Angeles suburbs): shown only when the pay is known and at least her minimum, and she isn't missing a required qualification.
+    const far = location.status === 'elsewhere_ca' && (profile.farAreas || []).some((a) => cityOnly(a) && cityOnly(a) === cityOnly(job.city));
+    const farOk = salary.status === 'meets_min' || salary.status === 'meets_desired', farLoc = far && farOk && classification !== 'needs_more';
+    if (far) location.text = `In ${job.city}, an area you asked to include — shown because the pay meets your minimum and nothing required is missing`;
     const meets = checks.filter((c) => c.status === 'met').map((c) => `${c.requirement} — ${c.note}`);
     const unverified = checks.filter((c) => c.status === 'reported').map((c) => `${c.requirement}${c.mandatory ? '' : ' (preferred)'} — ${c.note}`);
     const unknown = checks.filter((c) => c.status === 'unknown').map((c) => `${c.requirement}${c.mandatory ? '' : ' (preferred)'} — ${c.note}`);
@@ -232,7 +236,7 @@
       classification, overall, capped, payBonus, parts, reasons, meets, unverified, unknown, gaps,
       qualification: { level: qLevel, score: qScore, checks, mandatoryUnmet: unmet.length, mandatoryUnknown: mUnknown.length, mandatoryUnverified: mReported.length },
       salary, location, alignment: align, typeStatus,
-      excluded: { belowFloor: salary.status === 'below' },
+      excluded: { belowFloor: salary.status === 'below', farArea: far && !farLoc },
       explanation: 'Overall relevance is a weighted estimate of how well this listing aligns with the profile you entered: qualifications 35%, field alignment 25%, location 20%, salary 15%, employment type 5%. Pay above your desired rate adds up to 5 points. A required qualification you appear not to meet caps it at 60. It is not a prediction of whether you will be hired.',
     };
   }
@@ -241,7 +245,7 @@
   const isNearby = (m) => ['priority', 'preferred_city', 'within_commute'].includes(m.location.status);
   function visible(jobs, profile, ctx) {
     const showBelow = !!(profile.salary && profile.salary.showBelow);
-    return jobs.filter((j) => j.match && !j.userState.dismissed && !j.userState.reported && !['expired', 'possibly_expired', 'closed'].includes(j.status) && (showBelow || !j.match.excluded.belowFloor))
+    return jobs.filter((j) => j.match && !j.userState.dismissed && !j.userState.reported && !['expired', 'possibly_expired', 'closed'].includes(j.status) && (showBelow || !j.match.excluded.belowFloor) && !j.match.excluded.farArea)
       .sort((a, b) => b.match.overall - a.match.overall || ((annual(b.salaryMin, b.salaryMax, b.salaryPeriod) || { max: 0 }).max - (annual(a.salaryMin, a.salaryMax, a.salaryPeriod) || { max: 0 }).max));
   }
   function buildFeed(jobs, profile, ctx) {

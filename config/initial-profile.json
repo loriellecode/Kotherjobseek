@@ -23,6 +23,7 @@
     "cities": ["North Stockton, CA", "Stockton, CA", "Lodi, CA", "Tracy, CA", "Manteca, CA"],
     "commuteMiles": 30,
     "statewide": true,
+    "farAreas": ["Pasadena, CA", "Glendale, CA", "Burbank, CA", "Santa Clarita, CA", "Torrance, CA", "Long Beach, CA", "Santa Monica, CA", "Culver City, CA"],
     "workModes": ["onsite"],
     "types": ["Full-time"],
     "salary": { "min": 28, "desired": 30, "period": "hour" }

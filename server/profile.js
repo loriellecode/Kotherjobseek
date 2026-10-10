@@ -26,7 +26,7 @@ const CLEANERS = {
 function defaultData() {
   return {
     titles: [], categories: [...CATEGORIES], types: ['Full-time'], workModes: ['onsite'], cities: ['North Stockton, CA'], commuteMiles: 30, certsNone: false,
-    statewide: false, salary: { min: null, desired: null, period: 'year', showBelow: false },
+    statewide: false, farAreas: [], salary: { min: null, desired: null, period: 'year', showBelow: false },
     notify: { enabled: true, inApp: true, push: false, immediate: true, daily: false, weekly: false, dailyHour: 8, weeklyDay: 1, quietStart: 21, quietEnd: 7, tz: 'America/Los_Angeles', categories: { newMatches: true, deadlines: true, profileUpdates: true, sourceIssues: true } },
     searchEnabled: true,
   };
@@ -49,6 +49,7 @@ function cleanPrefs(patch, cur) {
   if ('certsNone' in patch) out.certsNone = !!patch.certsNone;
   if ('searchEnabled' in patch) out.searchEnabled = !!patch.searchEnabled;
   if ('statewide' in patch) out.statewide = !!patch.statewide;
+  if ('farAreas' in patch) out.farAreas = list(patch.farAreas, 12, 80) || [];
   if (patch.salary && typeof patch.salary === 'object') {
     const s = patch.salary; out.salary = { min: 'min' in s ? numOrNull(s.min) : cur.salary.min, desired: 'desired' in s ? numOrNull(s.desired) : cur.salary.desired, period: oneOf(s.period ?? cur.salary.period, ['year', 'hour'], 'year'), showBelow: 'showBelow' in s ? !!s.showBelow : cur.salary.showBelow };
   }
@@ -87,7 +88,7 @@ function classify(before, after) {
   for (const k of ['education', 'experience', 'skills', 'certs']) if (!eq(strip(before[k] || []).map((x) => (typeof x === 'object' ? x : x)), strip(after[k] || []))) { classes.add('broad'); changed.push(k); }
   if (!eq(before.titles, after.titles)) { classes.add('broad'); changed.push('preferred titles'); }
   if (!eq(before.categories, after.categories)) { classes.add('broad'); changed.push('career categories'); }
-  if (!eq(before.cities, after.cities) || before.commuteMiles !== after.commuteMiles || before.statewide !== after.statewide) { classes.add('location'); changed.push('location'); }
+  if (!eq(before.cities, after.cities) || before.commuteMiles !== after.commuteMiles || before.statewide !== after.statewide || !eq(before.farAreas, after.farAreas)) { classes.add('location'); changed.push('location'); }
   if (!eq(before.workModes, after.workModes)) { classes.add('location'); changed.push('work arrangement'); }
   if (!eq(before.salary, after.salary)) { classes.add('salary'); changed.push('salary'); }
   if (!eq(before.types, after.types)) { classes.add('salary'); changed.push('employment types'); }
