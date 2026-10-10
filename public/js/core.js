@@ -40,6 +40,9 @@
   /* Arrangement + location filters from the Discover header (applied before the feed is laid out). */
   A.filtered = () => A.S.jobs.filter((j) => {
     const s = A.session; if (s.mode === 'remote' && !j.remote) return false; if (s.mode === 'onsite' && j.remote) return false;
+    const prof = A.S.profile || {}, cityIn = (list) => !j.remote && list.some((c) => KJ.cityOnly(c) && KJ.cityOnly(c) === KJ.cityOnly(j.city));
+    if (s.where === 'home') return cityIn(prof.cities || []); if (s.where === 'la') return cityIn(prof.farAreas || []);
+    if (String(s.where).startsWith('city:')) return !j.remote && KJ.cityOnly(s.where.slice(5)) === KJ.cityOnly(j.city);
     if (s.where === 'near') return !!(j.match && KJ.isNearby(j.match)); if (s.where === 'california') return j.remote ? false : inCA(j);
     if (s.where === 'outside') return !j.remote && !inCA(j); if (s.where === 'remote') return !!j.remote; return true;
   });

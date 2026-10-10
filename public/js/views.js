@@ -218,7 +218,9 @@
       const opt = (items, cur) => items.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('');
       inner += `<div class="filterbar" role="group" aria-label="Filter jobs">
         <label class="fsel"><span>Show</span><select data-action="filter" data-key="mode">${opt([['all', 'All jobs'], ['remote', 'Remote only'], ['onsite', 'On-site only']], ses().mode)}</select></label>
-        <label class="fsel"><span>Where</span><select data-action="filter" data-key="where">${opt([['anywhere', 'Anywhere'], ['near', 'Near me'], ['remote', 'Remote']], ses().where)}</select></label>
+        <label class="fsel"><span>Where</span><select data-action="filter" data-key="where">${(() => { const nice = (c) => { const n = String(c).replace(/,\s*(CA|California)$/i, ''), k = KJ.cityOnly(n); return k && k !== n.toLowerCase() ? k.replace(/\b\w/g, (m) => m.toUpperCase()) : n; }, seen = new Set(), uniq = (a) => a.filter((c) => { const k = KJ.cityOnly(c); if (!k || seen.has(k)) return false; seen.add(k); return true; }), cur = ses().where, o = (v, l) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(l)}</option>`;
+          const home = uniq(p.cities || []), la = uniq(p.farAreas || []);
+          return o('anywhere', 'Anywhere in California') + o('remote', 'Remote') + (home.length ? `<optgroup label="Home area">${o('home', 'All home-area cities')}${home.map((c) => o('city:' + nice(c), nice(c))).join('')}</optgroup>` : '') + (la.length ? `<optgroup label="Los Angeles area">${o('la', 'All Los Angeles-area cities')}${la.map((c) => o('city:' + nice(c), nice(c))).join('')}</optgroup>` : ''); })()}</select></label>
         <label class="fsel full"><span>Kind of work</span><select data-action="filter" data-key="cat">${opt(chips.map((c) => [c, c]), ses().cat)}</select></label>
         <button class="fscan" data-action="search-now">${icon('refresh')} Look for new jobs</button></div>`;
       if (ses().q.trim()) {

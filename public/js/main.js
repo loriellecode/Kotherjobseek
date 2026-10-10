@@ -108,7 +108,7 @@
   }
   async function dismiss(id, back) {
     await A.api('PUT', `/api/jobs/${id}/dismissed`); const j = A.job(id); j.userState.dismissed = Date.now(); j.userState.saved = null;
-    if (back) { history.length > 1 ? history.back() : (location.hash = '#/discover'); } A.render(true); A.toast('Hidden from your feed.', 'Undo', 'restore', id);
+    if (back) goBack(); A.render(true); A.toast('Hidden from your feed.', 'Undo', 'restore', id);
   }
   async function markApplied(id) {
     const r = await A.api('PUT', `/api/applications/${id}`, { status: 'applied' }); S.apps[id] = r.application; ses.applyNote = ''; A.render(true);
@@ -139,7 +139,7 @@
       'toggle-search': () => { const away = route().r !== 'discover'; ses.searchOpen = away ? true : !ses.searchOpen; if (!ses.searchOpen) ses.q = ''; if (away) location.hash = '#/discover'; else A.render(true); const q = document.getElementById('q'); if (q) q.focus(); },
       cat: () => { ses.cat = t.dataset.cat; ses.q = ''; A.render(); }, more: () => { ses.cat = t.dataset.cat; ses.q = ''; if (route().r !== 'discover') location.hash = '#/discover'; A.render(); window.scrollTo(0, 0); },
       'clear-search': () => { ses.q = ''; A.render(); }, rail: () => { const r = document.getElementById(t.dataset.target); r.scrollBy({ left: Number(t.dataset.dir) * r.clientWidth * 0.85, behavior: 'smooth' }); },
-      back: () => (history.length > 1 ? history.back() : (location.hash = '#/discover')),
+      back: () => goBack(),
       notes: () => run(async () => { ses.notesOpen = !ses.notesOpen; A.render(true); if (ses.notesOpen && S.unread) { await A.api('POST', '/api/notifications/read'); S.unread = 0; S.notes.forEach((n) => (n.read_at = n.read_at || Date.now())); setTimeout(() => A.render(true), 0); } }),
       'close-pop': () => { ses.notesOpen = false; }, 'close-modal': A.closeModal,
       edit: () => A.editors.open(t.dataset.sec),
@@ -242,6 +242,10 @@
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
   });
+  /* Back: go to the previous screen of THIS app visit; if there isn't one (opened straight onto a job), go to Discover. Works the same in a browser tab and on the home screen. */
+  const navStack = [location.hash || '#/discover'];
+  function goBack() { if (navStack.length > 1) history.back(); else location.hash = '#/discover'; }
+  window.addEventListener('hashchange', () => { const h = location.hash || '#/discover'; if (navStack.length > 1 && navStack[navStack.length - 2] === h) navStack.pop(); else if (navStack[navStack.length - 1] !== h) navStack.push(h); });
   window.addEventListener('hashchange', () => { ses.notesOpen = false; A.render(); window.scrollTo(0, 0); });
 
   /* ---------- push (only works where the browser + server support it; verify on your own device) ---------- */
