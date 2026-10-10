@@ -15,7 +15,7 @@ const TOPICS = {
 };
 const TTL = 7 * 864e5;
 
-const PHOTO_DIR = path.join(__dirname, '..', 'public', 'photos');
+const PHOTO_DIR = process.env.PHOTO_DIR || path.join(__dirname, '..', 'public', 'photos');
 const slug = (t) => String(t).replace(/[^a-z0-9]+/g, '-');
 /* Your own free photos: put .jpg/.jpeg/.png/.webp files in public/photos/<topic>/ (e.g. public/photos/finance/) — or public/photos/any/ for all topics —
  * and optionally credit them in public/photos/credits.json: { "finance/desk.jpg": { "photographer": "Name", "url": "https://…" } }. Used only when no Pexels key is set. */

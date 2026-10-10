@@ -1,7 +1,7 @@
 'use strict';
 const t = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
 const { boot } = require('./helpers');
-const dir = path.join(__dirname, '..', 'public', 'photos');
+const dir = fs.mkdtempSync(require('node:os').tmpdir() + '/kj-photos-'); process.env.PHOTO_DIR = dir; // never touches the real public/photos
 t.describe('bundled / local photos (used when no Pexels key is set)', () => {
   t.it('serves your own photos with credits, falls back to “any”, and shows none when the folder is empty', async () => {
     const had = fs.existsSync(dir); fs.mkdirSync(path.join(dir, 'finance'), { recursive: true }); fs.mkdirSync(path.join(dir, 'any'), { recursive: true });
