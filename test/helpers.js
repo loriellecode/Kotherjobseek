@@ -89,4 +89,4 @@ function listenTls(handler) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tls-')); execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', dir + '/k.pem', '-out', dir + '/c.pem', '-days', '1', '-subj', '/CN=127.0.0.1'], { stdio: 'ignore' });
   return new Promise((r) => { const s = https.createServer({ key: fs.readFileSync(dir + '/k.pem'), cert: fs.readFileSync(dir + '/c.pem') }, handler); s.listen(0, '127.0.0.1', () => r({ server: s, port: s.address().port })); });
 }
-module.exports = { boot, adz, listen, listenTls, crypto, makeDocx, makePdf, RESUME_LINES };
+module.exports = { mockAdzuna, boot, adz, listen, listenTls, crypto, makeDocx, makePdf, RESUME_LINES };

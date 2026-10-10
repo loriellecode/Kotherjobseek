@@ -11,12 +11,21 @@
     "seed": "node --disable-warning=ExperimentalWarning scripts/seed-profile.js",
     "reset-password": "node --disable-warning=ExperimentalWarning scripts/reset-password.js",
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
-    "local": "node scripts/local.js"
+    "local": "node scripts/local.js",
+    "build:phone": "node scripts/build-phone.js",
+    "fetch-jobs": "node --disable-warning=ExperimentalWarning scripts/fetch-jobs.js"
   },
   "dependencies": {
     "jszip": "^3.10.2",
     "mammoth": "^1.13.0",
     "pdf-parse": "^1.1.1",
     "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@noble/hashes": "^2.4.0",
+    "buffer": "^6.0.3",
+    "esbuild": "^0.28.2",
+    "path-browserify": "^1.0.1",
+    "sql.js": "^1.14.2"
   }
 }

@@ -1,0 +1,51 @@
+name: Publish app
+
+# Builds the phone edition and publishes it to GitHub Pages:  https://loriellecode.github.io/Kotherjobseek/
+# Runs when the main branch changes, every morning (to refresh the job list), and when you press "Run workflow".
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 12 * * *'   # daily, about 5 am Pacific
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run the tests
+        run: npm test
+      - name: Fetch today's California job listings
+        # Keys live only in GitHub Secrets (Settings → Secrets and variables → Actions). Without them the app publishes with an empty job list.
+        env:
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+          USAJOBS_API_KEY: ${{ secrets.USAJOBS_API_KEY }}
+          USAJOBS_USER_EMAIL: ${{ secrets.USAJOBS_USER_EMAIL }}
+        run: node --disable-warning=ExperimentalWarning scripts/fetch-jobs.js jobs.json
+      - name: Build the phone app
+        run: node scripts/build-phone.js jobs.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

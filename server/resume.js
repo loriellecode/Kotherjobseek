@@ -36,7 +36,7 @@ async function validate(ext, buf) {
 const standalone = (buf) => { const u = new Uint8Array(buf.length); u.set(buf); return u; };
 async function extractText(ext, buf) {
   if (ext === '.pdf') { const pdf = require('pdf-parse/lib/pdf-parse.js'); const r = await withTimeout(pdf(standalone(buf), { max: 30 }), 25000, 'timeout'); return r.text || ''; }
-  const r = await withTimeout(require('mammoth').extractRawText({ buffer: buf }), 25000, 'timeout'); return r.value || '';
+  const r = await withTimeout(require('mammoth').extractRawText({ buffer: buf, arrayBuffer: standalone(buf).buffer }), 25000, 'timeout'); return r.value || '';
 }
 
 /* ---- conflicts & duplicates against the current profile ---- */

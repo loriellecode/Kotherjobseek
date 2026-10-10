@@ -140,7 +140,7 @@
   /* ---------- résumé panel (My Profile) ---------- */
   function resumePanel() {
     const R = S().resume && S().resume.resume, busy = S().busy && /résumé/i.test(S().busy);
-    const priv = `<p class="note priv">${icon('lock')} Private to your account and stored on this server. It is read here to suggest profile entries — never sent to an outside AI service or to employers.</p>`;
+    const priv = `<p class="note priv">${icon('lock')} Private to your account and stored where this app runs (on your phone in the phone edition). It is read here to suggest profile entries — never sent to an outside AI service or to employers.</p>`;
     if (busy) return `<section class="panel resume-panel"><h2>Résumé</h2><div class="statusbar run"><span class="spin"></span><div class="grow"><b>${esc(S().busy)}…</b></div></div></section>`;
     if (!R) return `<section class="panel resume-panel"><h2>Résumé</h2><p class="note" style="margin-top:0">Upload a PDF or Word résumé. Kother suggests education, work history, skills and credentials for you to review, then uses what you approve to widen your job search.</p><div class="actions"><button class="btn primary" data-action="resume-upload">${icon('upload')} Upload résumé</button><button class="btn quiet" data-action="edit" data-sec="experience">Enter work history manually</button></div><p class="note">PDF or DOCX, up to 5 MB.</p>${priv}</section>`;
     const st = { ready: ['Analysis complete', 'ok'], failed: ['Analysis failed', 'bad'], processing: ['Processing…', 'run'] }[R.status] || ['', ''], c = R.counts;
@@ -200,7 +200,7 @@
       const chips = KJ.chips(p); if (!chips.includes(ses().cat)) ses().cat = 'For You';
       const JOBS = A.filtered(), seg = (k, items) => `<div class="seg" role="group" aria-label="${k}">${items.map(([v, l]) => `<button data-action="set-${k}" data-v="${v}" aria-pressed="${ses()[k] === v}">${l}</button>`).join('')}</div>`;
       inner += `<div class="filters">${seg('mode', [['all', 'All'], ['remote', 'Remote'], ['onsite', 'On-site']])}<button class="pillbtn" data-action="search-now">${icon('refresh')} Scan for opportunities</button></div>
-        <div class="flabel">Location</div><div class="chips lightchips" role="group" aria-label="Location">${[['anywhere', 'Anywhere'], ['near', 'Near me'], ['california', 'California'], ['remote', 'Remote'], ['outside', 'Outside California']].map(([v, l]) => `<button class="chip" data-action="set-where" data-v="${v}" aria-pressed="${ses().where === v}">${l}</button>`).join('')}</div>
+        <div class="flabel">Location</div><div class="chips lightchips" role="group" aria-label="Location">${[['anywhere', 'Anywhere'], ['near', 'Near me'], ['california', 'California'], ['remote', 'Remote']].map(([v, l]) => `<button class="chip" data-action="set-where" data-v="${v}" aria-pressed="${ses().where === v}">${l}</button>`).join('')}</div>
         <div class="flabel">Focus</div>`;
       inner += `<div class="chips" role="group" aria-label="Categories">${chips.map((c) => `<button class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${ses().cat === c}">${esc(c)}</button>`).join('')}</div>`;
       if (ses().q.trim()) {

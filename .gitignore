@@ -2,3 +2,6 @@ node_modules/
 data/
 .env
 *.log
+site/
+phone/.generated/
+phone/photos-manifest.json

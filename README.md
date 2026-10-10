@@ -15,10 +15,21 @@ npm test                 # 73 tests run, 3 more live-provider checks skip withou
 ```
 
 ## Running it for one person (free, private, on her computer)
-GitHub Pages can only host static pages, so it cannot run this app (login, résumé storage, job searches and secret keys need a server). The free, private way to use it is on her own computer:
+(The phone edition below is the easiest way. This section is the alternative: running the full server edition on a computer.)
 1. Install Node 22.5 or newer (https://nodejs.org). 2. In this folder run `npm install` once. 3. Run `npm run local` — it starts the app and opens http://localhost:3000.
 Her data (database and résumé files) stays in `./data` on that computer. To reach it from her phone on the same Wi-Fi, run `HOST=0.0.0.0 npm start` and open `http://<computer-ip>:3000` — only do this on a network you trust.
 Live job listings still need free API keys in `.env` (Adzuna and/or USAJOBS); without keys the app opens but shows no listings.
+
+## Phone edition on GitHub Pages (free; her data stays on her phone)
+The app also builds as a static site that runs **entirely in the browser** — the same matching, trust checks, résumé reading, applications and email assistant, with data saved in the phone's own storage (IndexedDB). There is no server holding her profile, résumé, saved jobs or drafts, and nothing about her is ever sent anywhere. Address: **https://loriellecode.github.io/Kotherjobseek/**
+Set-up (buttons on GitHub, once):
+1. **Merge this branch into `main`** (open a pull request and merge it). GitHub only publishes Pages from `main` by default.
+2. Repository **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. (For live listings) **Settings → Secrets and variables → Actions → New repository secret**: `ADZUNA_APP_ID` + `ADZUNA_APP_KEY` (free, https://developer.adzuna.com/signup) and/or `USAJOBS_API_KEY` + `USAJOBS_USER_EMAIL` (free, https://developer.usajobs.gov/apirequest/). Keys stay in GitHub Secrets and are never in the app.
+4. **Actions → Publish app → Run workflow.** It runs the tests, fetches today's California listings, builds the app and publishes it. It repeats every morning to refresh the job list.
+5. On her phone open the address, then **Share → Add to Home Screen** (iPhone) or **⋮ → Install app** (Android). The icon is the document-and-magnifier mark.
+How it works: the daily GitHub job runs the real search for the starter profile (public job titles and California places — nothing personal) and publishes the listings as `jobs.json`. Her phone downloads that list and does the matching on the phone using *her* profile. Without keys the app still opens but shows no listings (it never invents any).
+Honest limits of the phone edition: data lives in that one browser/phone (clearing site data or switching phones loses it — there is no cloud backup); no push notifications (alerts show in the app); no live "Re-check" page fetch (browsers block it; trust checks use the listing and link only); the job list updates once a day; and the Pexels key isn’t used — add free photos under `public/photos/` (see Photos) before publishing. `npm run build:phone` builds locally into `site/`; `node test/e2e/phone.e2e.js` is the browser check.
 
 ## Photos
 With a `PEXELS_API_KEY` the app uses Pexels photos (credited). Without one it uses **your own free photos**: put `.jpg`/`.png`/`.webp` files in `public/photos/<topic>/` (topics: `finance`, `business`, `education`, `special-education`, `workforce`, `banking`, `remote-work`, `workplace`, `professional-development`, `career-growth`) or `public/photos/any/` for all topics, and credit them in `public/photos/credits.json`: `{ "finance/desk.jpg": { "photographer": "Name", "url": "https://…" } }`. No photos are bundled in this repository (the build environment had no internet to download any), and the app never shows a photo as a picture of a specific employer.
