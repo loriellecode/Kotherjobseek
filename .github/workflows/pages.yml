@@ -4,7 +4,7 @@ name: Publish app
 # Runs when the main branch changes, every morning (to refresh the job list), and when you press "Run workflow".
 on:
   push:
-    branches: [main]
+    branches: [main, claude/apple-news-job-discovery]
   schedule:
     - cron: '17 12 * * *'   # daily, about 5 am Pacific
   workflow_dispatch:
