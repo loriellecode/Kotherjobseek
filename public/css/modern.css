@@ -195,3 +195,6 @@ body::before { content: ""; position: absolute; z-index: -1; left: 0; right: 0; 
 @media (max-width: 560px) { body::before { height: 262px; } .hero-body { padding-top: 34px; } }
 .hero-credit { max-width: calc(100% - 28px); text-align: right; }
 @media (min-width: 561px) { body::before { height: 300px; } }
+
+/* ---------- Phone: everything one step smaller (iPhone feedback) ---------- */
+@media (max-width: 560px) { #app, #modal-root, #toast-root { zoom: .84; } .chip { height: 32px; padding: 0 12px; font-size: 13px; } .flabel { font-size: 11px; margin-top: 10px; } .chips { gap: 5px; } .seg button { height: 32px; font-size: 11px; } .pillbtn { height: 36px; font-size: 13px; } }
