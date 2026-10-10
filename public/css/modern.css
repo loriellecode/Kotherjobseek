@@ -306,3 +306,10 @@ html { background: linear-gradient(#2a1fc4, #2a1fc4) top / 100% env(safe-area-in
   .topbar { padding-top: 4px; }
   body::before { height: calc(250px + env(safe-area-inset-top, 0px)); }
 }
+
+/* No coloured header strip: plain page background, dark text, white pill bar with a light outline */
+body::before { display: none !important; }
+html { background: var(--bg) !important; }
+.topbar, .topbar .eyebrow, h1.page, .topbar .back, .back { color: var(--ink) !important; }
+.topbar .eyebrow { opacity: .85 !important; }
+.dock { background: var(--surface) !important; border: 2px solid var(--line) !important; box-shadow: none; }
