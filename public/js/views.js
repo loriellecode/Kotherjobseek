@@ -216,10 +216,12 @@
     else {
       const chips = KJ.chips(p); if (!chips.includes(ses().cat)) ses().cat = 'For You';
       const JOBS = A.filtered(), seg = (k, items) => `<div class="seg" role="group" aria-label="${k}">${items.map(([v, l]) => `<button data-action="set-${k}" data-v="${v}" aria-pressed="${ses()[k] === v}">${l}</button>`).join('')}</div>`;
-      inner += `<div class="filters">${seg('mode', [['all', 'All'], ['remote', 'Remote'], ['onsite', 'On-site']])}<button class="pillbtn" data-action="search-now">${icon('refresh')} Scan for opportunities</button></div>
-        <div class="flabel">Location</div><div class="chips lightchips" role="group" aria-label="Location">${[['anywhere', 'Anywhere'], ['near', 'Near me'], ['california', 'California'], ['remote', 'Remote']].map(([v, l]) => `<button class="chip" data-action="set-where" data-v="${v}" aria-pressed="${ses().where === v}">${l}</button>`).join('')}</div>
-        <div class="flabel">Focus</div>`;
-      inner += `<div class="chips" role="group" aria-label="Categories">${chips.map((c) => `<button class="chip" data-action="cat" data-cat="${esc(c)}" aria-pressed="${ses().cat === c}">${esc(c)}</button>`).join('')}</div>`;
+      const opt = (items, cur) => items.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`).join('');
+      inner += `<div class="filterbar" role="group" aria-label="Filter jobs">
+        <label class="fsel"><span>Show</span><select data-action="filter" data-key="mode">${opt([['all', 'All jobs'], ['remote', 'Remote only'], ['onsite', 'On-site only']], ses().mode)}</select></label>
+        <label class="fsel"><span>Where</span><select data-action="filter" data-key="where">${opt([['anywhere', 'Anywhere'], ['near', 'Near me'], ['remote', 'Remote']], ses().where)}</select></label>
+        <label class="fsel full"><span>Kind of work</span><select data-action="filter" data-key="cat">${opt(chips.map((c) => [c, c]), ses().cat)}</select></label>
+        <button class="fscan" data-action="search-now">${icon('refresh')} Look for new jobs</button></div>`;
       if (ses().q.trim()) {
         const res = KJ.search(JOBS, p, ses().q);
         inner += `<div class="sec-head" style="margin-top:20px"><div class="grow"><h2>${A.plural(res.length, 'result')} for “${esc(ses().q.trim())}”</h2><p>Search covers every listing you haven’t dismissed.</p></div></div>${res.length ? `<div class="grid">${res.map((j) => card(j)).join('')}</div>` : emptyFeed('search')}`;

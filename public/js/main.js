@@ -180,6 +180,7 @@
   document.addEventListener('change', (e) => {
     const t = e.target;
     if (t.id === 'file-in') importFile(t.files[0]), (t.value = '');
+    else if (t.dataset.action === 'filter') { if (t.dataset.key === 'cat') { ses.cat = t.value; ses.q = ''; A.render(); } else { ses[t.dataset.key] = t.value; A.render(true); } }
     else if (t.dataset.action === 'theme') { try { localStorage.setItem('kj.theme', t.value); } catch (_) { /* ignore */ } applyTheme(); }
     else if (t.dataset.action === 'resume-pick' && t.files[0]) jobAction(async () => {
       const f = t.files[0]; t.value = ''; A.setBusy('Uploading and reading your résumé');

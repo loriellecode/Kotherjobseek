@@ -259,3 +259,17 @@ a { text-underline-offset: 3px; }
   body::before { height: 300px; }
 }
 @media (max-width: 560px) { body::before { height: 345px; } }
+
+/* ---------- Neater layout: one tidy filter card with drop-downs; calm header band ---------- */
+body::before { background: linear-gradient(170deg, #241bb5 0%, #3541d8 100%); height: 250px; border-radius: 0 0 36px 36px; }
+@media (max-width: 560px) { body::before { height: 285px; border-radius: 0 0 28px 28px; } }
+.filterbar { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0 22px; padding: 16px; background: var(--surface); border-radius: 22px; box-shadow: var(--shadow-sm); }
+@media (min-width: 760px) { .filterbar { grid-template-columns: 1fr 1fr 1.2fr auto; align-items: end; } }
+.fsel { display: flex; flex-direction: column; gap: 6px; min-width: 0; } .fsel.full { grid-column: 1 / -1; } @media (min-width: 760px) { .fsel.full { grid-column: auto; } }
+.fsel span { font-size: 15px; font-weight: 700; color: var(--ink); }
+.fsel select { width: 100%; min-height: 48px; padding: 0 40px 0 14px; font: 600 16px var(--sans); color: var(--ink); background-color: var(--surface-2); border: 2px solid transparent; border-radius: 14px; appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%233b2fe0' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+.fsel select:focus-visible { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.fscan { grid-column: 1 / -1; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 18px; font: 700 16px var(--sans); color: var(--accent-ink); background: var(--accent); border: 0; border-radius: 14px; cursor: pointer; }
+@media (min-width: 760px) { .fscan { grid-column: auto; } }
+.topbar { padding-bottom: 6px; }
