@@ -13,7 +13,7 @@ const outFile = process.argv[2] || 'jobs.json';
   const configured = providers.filter((p) => p.configured().ok);
   const meta = { generatedAt: new Date().toISOString(), sources: configured.map((p) => p.name), note: '' };
   if (!configured.length) {
-    const snap = path.join(__dirname, '..', 'config', 'jobs-snapshot.json');
+    const snap = process.env.JOBS_SNAPSHOT || path.join(__dirname, '..', 'config', 'jobs-snapshot.json');
     if (fs.existsSync(snap)) { const d = JSON.parse(fs.readFileSync(snap, 'utf8')); d.note = 'Listings from the last saved snapshot (' + d.generatedAt + '). No job-search keys are set, so they were not refreshed. Add the keys as repository secrets to refresh daily.'; console.warn('::warning::' + d.note); fs.writeFileSync(outFile, JSON.stringify(d)); return; }
     meta.note = 'No job-search keys are set, so no listings were fetched. Add ADZUNA_APP_ID/ADZUNA_APP_KEY and/or USAJOBS_API_KEY/USAJOBS_USER_EMAIL as repository secrets, then run “Publish app” again.';
     console.warn('::warning::' + meta.note); fs.writeFileSync(outFile, JSON.stringify(Object.assign(meta, { jobs: [] }))); return;

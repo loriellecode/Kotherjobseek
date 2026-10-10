@@ -10,8 +10,14 @@ const run = (env) => new Promise((resolve) => execFile(process.execPath, ['--dis
 t.describe('phone edition: daily job list', () => {
   t.it('without keys it publishes an honest empty list (never sample jobs)', async () => {
     const OUT = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kj-')), 'jobs.json');
-    const r = await run({ OUT, ADZUNA_APP_ID: '', ADZUNA_APP_KEY: '', USAJOBS_API_KEY: '', USAJOBS_USER_EMAIL: '' });
+    const r = await run({ OUT, JOBS_SNAPSHOT: path.join(os.tmpdir(), 'no-such-snapshot.json'), ADZUNA_APP_ID: '', ADZUNA_APP_KEY: '', USAJOBS_API_KEY: '', USAJOBS_USER_EMAIL: '' });
     const d = JSON.parse(fs.readFileSync(OUT, 'utf8')); assert.deepEqual(d.jobs, []); assert.match(d.note, /No job-search keys/); assert.match(r.stdout + r.stderr, /warning/);
+  });
+  t.it('without keys but with a saved snapshot it republishes the snapshot, labelled with its date', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kj-')), OUT = path.join(dir, 'jobs.json'), snap = path.join(dir, 'snap.json');
+    fs.writeFileSync(snap, JSON.stringify({ generatedAt: '2026-01-02T00:00:00Z', count: 1, jobs: [{ externalId: 'adzuna:1', title: 'Budget Analyst', employer: 'Test County', city: 'Stockton', state: 'California', description: 'Prepare budgets and reports for the county department.', applyUrl: 'https://www.adzuna.com/details/1' }] }));
+    await run({ OUT, JOBS_SNAPSHOT: snap, ADZUNA_APP_ID: '', ADZUNA_APP_KEY: '', USAJOBS_API_KEY: '', USAJOBS_USER_EMAIL: '' });
+    const d = JSON.parse(fs.readFileSync(OUT, 'utf8')); assert.equal(d.jobs.length, 1); assert.match(d.note, /last saved snapshot \(2026-01-02/);
   });
   t.it('with keys it fetches, keeps California only, drops quarantined listings, and the result loads through the normal normalizer', async () => {
     const m = await mockAdzuna(); const OUT = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kj-')), 'jobs.json');
