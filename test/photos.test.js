@@ -11,7 +11,7 @@ t.describe('bundled / local photos (used when no Pexels key is set)', () => {
     try {
       const f = (await c.req('GET', '/api/imagery/finance')).data; assert.equal(f.photo.src.medium, '/photos/finance/desk.jpg'); assert.equal(f.photo.photographer, 'Test Person'); assert.equal(f.photo.pageUrl, 'https://example.com/p');
       const b = (await c.req('GET', '/api/imagery/business')).data; assert.equal(b.photo.src.medium, '/photos/any/office.png'); assert.equal(b.photo.photographer, 'a free-license photographer');
-      assert.equal((await c.req('GET', '/photos/finance/desk.jpg')).status, 200);
+      assert.equal((await c.req('GET', '/photos/finance/finance-1.jpg')).status, 200, 'the bundled photos are served');
       fs.rmSync(path.join(dir, 'finance'), { recursive: true }); fs.rmSync(path.join(dir, 'any'), { recursive: true }); assert.equal((await c.req('GET', '/api/imagery/finance')).data.photo, null);
     } finally { cfg.pexels.key = key; env.close(); fs.rmSync(path.join(dir, 'credits.json'), { force: true }); if (!had) fs.rmSync(dir, { recursive: true, force: true }); }
   });
